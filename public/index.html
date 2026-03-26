@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Gestão</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .card { border: 1px solid #ccc; padding: 15px; width: 300px; border-radius: 8px;}
+        .lucro { color: green; font-weight: bold; }
+        .btn { padding: 10px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 8px; font-weight: bold; color: white;}
+        .btn-verde { background: #4CAF50; }
+        .btn-verde:hover { background: #45a049; }
+        .btn-laranja { background: #ff9800; }
+    </style>
+</head>
+<body>
+
+    <h1>Painel de Gestão do Rafa</h1>
+    
+    <div class="card">
+        <h2 id="nome-produto">Carregando...</h2>
+        
+        <p>Preço Atual: <span id="preco-atual" style="font-weight: bold;">R$ 0.00</span> 
+           <span id="badge-promo" style="display: none; background: #ffeb3b; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #d32f2f; font-weight: bold;">PROMOÇÃO ATIVA</span>
+        </p>
+        
+        <p>Estoque Atual: <span id="estoque">--</span> unidades</p>
+        <p>Margem de Lucro: <span id="margem" class="lucro">--</span>%</p>
+        <p>Markup Aplicado: <span id="markup" class="lucro">--</span>%</p>
+        <p>Lucro (última venda): <span id="lucro" class="lucro">R$ 0.00</span></p>
+        <p id="notificacao" style="color: blue;"></p>
+
+        <hr>
+        <button id="btn-vender" class="btn btn-verde">Simular Venda</button>
+        <button id="btn-promo" class="btn btn-laranja">Ativar Promoção</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const elNome = document.getElementById('nome-produto');
+        const elPreco = document.getElementById('preco-atual');
+        const badgePromo = document.getElementById('badge-promo');
+        const elEstoque = document.getElementById('estoque');
+        const elMargem = document.getElementById('margem');
+        const elMarkup = document.getElementById('markup');
+        const elLucro = document.getElementById('lucro');
+        const elNotificacao = document.getElementById('notificacao');
+        const btnPromo = document.getElementById('btn-promo');
+
+        function atualizarUIPromocao(emPromocao, preco) {
+            elPreco.innerText = `R$ ${preco.toFixed(2)}`;
+            if (emPromocao) {
+                badgePromo.style.display = 'inline';
+                btnPromo.innerText = "Desativar Promoção";
+                btnPromo.style.background = "#f44336";
+            } else {
+                badgePromo.style.display = 'none';
+                btnPromo.innerText = "Ativar Promoção";
+                btnPromo.style.background = "#ff9800";
+            }
+        }
+
+        socket.on('dados_iniciais', (produto) => {
+            elNome.innerText = produto.nome;
+            elEstoque.innerText = produto.estoque;
+            atualizarUIPromocao(produto.emPromocao, produto.precoAtual);
+        });
+
+        socket.on('atualizacao_estoque', (dados) => {
+            elEstoque.innerText = dados.novoEstoque;
+            elLucro.innerText = `R$ ${dados.lucroGerado.toFixed(2)}`;
+            elMargem.innerText = dados.margem.toFixed(2);
+            elMarkup.innerText = dados.markup.toFixed(2);
+            elNotificacao.innerText = dados.mensagem;
+        });
+
+        socket.on('status_promocao', (dados) => {
+            atualizarUIPromocao(dados.emPromocao, dados.precoAtual);
+            elNotificacao.innerText = "Preço atualizado no banco de dados!";
+        });
+
+        document.getElementById('btn-vender').addEventListener('click', () => {
+            fetch('http://localhost:3005/vender', { method: 'POST' });
+        });
+
+        document.getElementById('btn-promo').addEventListener('click', () => {
+            fetch('http://localhost:3005/toggle-promocao', { method: 'POST' });
+        });
+    </script>
+</body>
+</html>
