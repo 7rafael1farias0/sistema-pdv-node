@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Estoque - PDV</title>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 20px; background-color: #121212; color: #e0e0e0; }
+        .cabecalho { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        h1 { color: #ffffff; margin: 0; font-weight: 400; font-size: 1.8em; letter-spacing: 1px; }
+        .nav-links { display: flex; gap: 15px; }
+        .btn-nav { background-color: transparent; color: #00f2fe; border: 1px solid #00f2fe; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: 500; transition: all 0.3s ease; cursor: pointer; }
+        .btn-nav:hover { background-color: #00f2fe; color: #121212; }
+        .btn-sair { border-color: #ff4757; color: #ff4757; }
+        .btn-sair:hover { background-color: #ff4757; color: #fff; }
+        .container { display: flex; gap: 20px; flex-wrap: wrap; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 8px; flex: 1; min-width: 300px; border-top: 2px solid #00f2fe; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .card h3 { margin: 0 0 20px 0; color: #888; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
+        input { display: block; width: 100%; padding: 12px; margin: 10px 0 15px 0; background-color: #121212; border: 1px solid #333; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        input:focus { border-color: #00f2fe; outline: none; }
+        button { cursor: pointer; border: none; border-radius: 4px; font-weight: bold; padding: 12px; width: 100%; transition: 0.3s; text-transform: uppercase; }
+        .btn-cadastrar { background-color: #00f2fe; color: #121212; }
+        .btn-cadastrar:hover { background-color: #00d4df; }
+        .table-container { flex: 2; min-width: 600px; background: #1e1e1e; padding: 25px; border-radius: 8px; border-top: 2px solid #333; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 15px 10px; text-align: left; border-bottom: 1px solid #2a2a2a; }
+        th { background-color: #121212; color: #888; font-size: 0.85em; text-transform: uppercase; }
+        tr:hover td { background-color: #1a1a1a; }
+        .btn-editar { background: transparent; color: #feca57; border: 1px solid #feca57; padding: 5px 10px; margin-right: 5px; border-radius: 4px; width: auto;}
+        .btn-excluir { background: transparent; color: #ff4757; border: 1px solid #ff4757; padding: 5px 10px; border-radius: 4px; width: auto;}
+        .badge-promo { padding: 5px 10px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid transparent; width: auto;}
+        .promo-ativa { color: #00ff87; border-color: #00ff87; background: transparent; }
+        .promo-inativa { color: #555; border-color: #333; background: transparent; }
+    </style>
+</head>
+<body>
+
+    <div class="cabecalho">
+        <h1>Gestão de Estoque</h1>
+        <div class="nav-links">
+            <a href="/" class="btn-nav">Caixa</a>
+            <a href="/dashboard.html" class="btn-nav">Dashboard</a>
+            <button onclick="fazerLogout()" class="btn-nav btn-sair">Sair</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h3 id="tituloFormulario">Cadastrar Novo Produto</h3>
+            <form id="formProduto">
+                <input type="text" id="codigo" placeholder="SKU (Ex: 001)" required>
+                <input type="text" id="nome" placeholder="Nome do Produto" required>
+                <div style="display: flex; gap: 10px;">
+                    <input type="number" id="precoCusto" placeholder="Custo (R$)" step="0.01" required>
+                    <input type="number" id="precoVenda" placeholder="Venda (R$)" step="0.01" required>
+                </div>
+                <input type="number" id="precoPromocao" placeholder="Promocional (Opcional)" step="0.01">
+                <input type="number" id="estoque" placeholder="Estoque Atual" required>
+                <button type="submit" class="btn-cadastrar" id="btnSubmit">Adicionar</button>
+                <button type="button" id="btnCancelar" style="display: none; background: transparent; color: #888; border: 1px solid #555; margin-top: 10px;">Cancelar</button>
+            </form>
+        </div>
+
+        <div class="card" style="border-top-color: #feca57; min-width: 250px; flex: initial;">
+            <h3>📥 Importar Lote (CSV)</h3>
+            <input type="file" id="arquivoCsv" accept=".csv" style="padding: 5px; cursor: pointer;">
+            <button class="btn-cadastrar" onclick="importarCSV()" style="background-color: #feca57; color: #121212; margin-top: 5px;">Processar Arquivo</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>SKU</th><th>Produto</th><th>Custo</th><th>Venda</th><th>Promo</th><th>Estoque</th><th>Ações</th></tr>
+                </thead>
+                <tbody id="listaCorpo"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const token = localStorage.getItem('pdv_token');
+        if (!token) window.location.href = 'login.html';
+
+        function fazerLogout() {
+            localStorage.removeItem('pdv_token');
+            window.location.href = 'login.html';
+        }
+
+        const socket = io();
+        const form = document.getElementById('formProduto');
+        const listaCorpo = document.getElementById('listaCorpo');
+        let idEmEdicao = null;
+
+        const authHeader = { 'Authorization': `Bearer ${token}` };
+
+        async function carregarProdutos() {
+            const res = await fetch('/api/produtos', { headers: authHeader });
+            if (res.status === 401 || res.status === 403) return fazerLogout();
+            const produtos = await res.json();
+            listaCorpo.innerHTML = "";
+            produtos.forEach(p => {
+                const emPromo = p.emPromocao === 1;
+                const htmlPreco = emPromo ? `<span style="text-decoration:line-through; color:#555;">R$ ${p.precoVenda.toFixed(2)}</span> <strong style="color:#00ff87;">R$ ${p.precoPromocao.toFixed(2)}</strong>` : `R$ ${p.precoVenda.toFixed(2)}`;
+                const btnPromo = emPromo ? `<button class="badge-promo promo-ativa" onclick="alternarPromocao(${p.id})">ATIVADA</button>` : `<button class="badge-promo promo-inativa" onclick="alternarPromocao(${p.id})">INATIVA</button>`;
+                
+                listaCorpo.innerHTML += `
+                    <tr>
+                        <td style="color:#00f2fe;">${p.codigo}</td><td>${p.nome}</td><td style="color:#aaa;">R$ ${p.precoCusto.toFixed(2)}</td>
+                        <td>${htmlPreco}</td><td>${btnPromo}</td><td>${p.estoque}</td>
+                        <td>
+                            <button class="btn-editar" onclick="prepararEdicao(${p.id}, '${p.codigo}', '${p.nome}', ${p.precoCusto}, ${p.precoVenda}, ${p.precoPromocao}, ${p.estoque})">EDITAR</button>
+                            <button class="btn-excluir" onclick="excluirProduto(${p.id})">X</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const dados = {
+                codigo: document.getElementById('codigo').value, nome: document.getElementById('nome').value,
+                precoCusto: parseFloat(document.getElementById('precoCusto').value), precoVenda: parseFloat(document.getElementById('precoVenda').value),
+                precoPromocao: parseFloat(document.getElementById('precoPromocao').value) || parseFloat(document.getElementById('precoVenda').value),
+                estoque: parseInt(document.getElementById('estoque').value)
+            };
+            const url = idEmEdicao ? `/api/produtos/${idEmEdicao}` : '/api/produtos';
+            const metodo = idEmEdicao ? 'PUT' : 'POST';
+
+            await fetch(url, { method: metodo, headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(dados) });
+            form.reset(); idEmEdicao = null; document.getElementById('btnCancelar').style.display = "none";
+        });
+
+        window.prepararEdicao = (id, c, n, pc, pv, pp, e) => {
+            idEmEdicao = id; document.getElementById('codigo').value = c; document.getElementById('nome').value = n;
+            document.getElementById('precoCusto').value = pc; document.getElementById('precoVenda').value = pv;
+            document.getElementById('precoPromocao').value = pp; document.getElementById('estoque').value = e;
+            document.getElementById('btnCancelar').style.display = "block";
+        };
+
+        document.getElementById('btnCancelar').addEventListener('click', () => { form.reset(); idEmEdicao = null; document.getElementById('btnCancelar').style.display = "none"; });
+
+        window.alternarPromocao = async (id) => await fetch(`/api/produtos/${id}/promocao`, { method: 'PUT', headers: authHeader });
+        window.excluirProduto = async (id) => { if(confirm("Excluir?")) await fetch(`/api/produtos/${id}`, { method: 'DELETE', headers: authHeader }); };
+
+        window.importarCSV = async () => {
+            const input = document.getElementById('arquivoCsv');
+            if (!input.files[0]) return alert("⚠️ Selecione um ficheiro CSV primeiro!");
+            
+            const leitor = new FileReader();
+            leitor.onload = async function(e) {
+                const linhas = e.target.result.split('\n');
+                const produtosParaEnviar = [];
+                
+                // Pula a primeira linha (cabeçalho) e processa as seguintes
+                for (let i = 1; i < linhas.length; i++) {
+                    const l = linhas[i].trim(); 
+                    if (l === '') continue;
+                    
+                    // Deteta se usa vírgula ou ponto e vírgula
+                    const separador = l.includes(';') ? ';' : ',';
+                    const c = l.split(separador);
+                    
+                    if (c.length >= 5) {
+                        produtosParaEnviar.push({ 
+                            codigo: c[0].trim(), 
+                            nome: c[1].trim(), 
+                            precoCusto: parseFloat(c[2].trim()), // Garante que é número
+                            precoVenda: parseFloat(c[3].trim()), 
+                            estoque: parseInt(c[4].trim()) 
+                        });
+                    }
+                }
+                
+                if (produtosParaEnviar.length > 0) {
+                    try {
+                        console.log("A enviar produtos para o backend:", produtosParaEnviar);
+                        
+                        const res = await fetch('/api/produtos/lote', { 
+                            method: 'POST', 
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'Authorization': `Bearer ${token}` // O Crachá JWT vai aqui!
+                            }, 
+                            body: JSON.stringify({ produtos: produtosParaEnviar }) 
+                        });
+                        
+                        if (res.ok) {
+                            alert(`✅ ${produtosParaEnviar.length} produtos importados com sucesso!`); 
+                            input.value = "";
+                            carregarProdutos();
+                        } else {
+                            const erroBackend = await res.json();
+                            alert(`❌ O servidor recusou a inserção: ${erroBackend.erro || erroBackend.message || 'Erro desconhecido'}`);
+                        }
+                    } catch (erro) {
+                        alert("❌ Erro de comunicação com a API (veja a consola F12).");
+                        console.error("Erro no fetch:", erro);
+                    }
+                } else {
+                    alert("⚠️ O ficheiro parece estar vazio ou no formato errado.");
+                }
+            };
+            leitor.readAsText(input.files[0], 'UTF-8');
+        };
+
+        socket.on('atualizacao_geral', carregarProdutos); socket.on('venda_realizada', carregarProdutos);
+        carregarProdutos();
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - PDV</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #121212; color: #e0e0e0; }
+        .cabecalho { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        h1 { color: #ffffff; margin: 0; font-weight: 400; font-size: 1.8em; letter-spacing: 1px; }
+        .nav-links { display: flex; gap: 15px; }
+        .btn-nav { background-color: transparent; border: 1px solid #00f2fe; color: #00f2fe; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
+        .btn-nav:hover { background-color: #00f2fe; color: #121212; }
+        .btn-sair { border-color: #ff4757; color: #ff4757; }
+        .btn-sair:hover { background-color: #ff4757; color: #fff; }
+        .cards-container { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+        .card { background: #1e1e1e; padding: 25px 20px; border-radius: 8px; flex: 1; min-width: 200px; text-align: center; border-top: 2px solid #333; }
+        .card h3 { margin: 0 0 15px 0; color: #888; font-size: 0.85em; text-transform: uppercase; }
+        .card .valor { font-size: 2.2em; font-weight: 300; color: #fff; }
+        .grafico-container { background: #1e1e1e; padding: 30px; border-radius: 8px; max-width: 850px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+
+    <div class="cabecalho">
+        <h1>Visão Geral</h1>
+        <div class="nav-links">
+            <button onclick="baixarRelatorio()" class="btn-nav" style="border-color: #00ff87; color: #00ff87;">📥 Exportar CSV</button>
+            <a href="/" class="btn-nav">Caixa</a>
+            <a href="/estoque.html" class="btn-nav">Estoque</a>
+            <button onclick="fazerLogout()" class="btn-nav btn-sair">Sair</button>
+        </div>
+    </div>
+
+    <div class="cards-container">
+        <div class="card" style="border-top-color: #00f2fe;"><h3>Faturamento Bruto</h3><div class="valor" id="valFaturamento">R$ 0,00</div></div>
+        <div class="card" style="border-top-color: #00ff87;"><h3>Lucro Líquido</h3><div class="valor" id="valLucro">R$ 0,00</div></div>
+        <div class="card" style="border-top-color: #fe00a1;"><h3>Margem Média</h3><div class="valor" id="valMargem">0%</div></div>
+        <div class="card" style="border-top-color: #feca57;"><h3>Total de Vendas</h3><div class="valor" id="valQtdVendas">0</div></div>
+    </div>
+
+    <div class="grafico-container">
+        <canvas id="graficoProdutos"></canvas>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const token = localStorage.getItem('pdv_token');
+        if (!token) window.location.href = 'login.html';
+
+        function fazerLogout() {
+            localStorage.removeItem('pdv_token');
+            window.location.href = 'login.html';
+        }
+
+        // Envia o token via URL para permitir o download direto do arquivo pelo navegador
+        function baixarRelatorio() {
+            window.location.href = `/api/exportar-vendas?token=${token}`;
+        }
+
+        const socket = io();
+        let meuGrafico = null;
+        Chart.defaults.color = '#888';
+
+        async function carregarDashboard() {
+            const resposta = await fetch('/api/relatorios', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (resposta.status === 401 || resposta.status === 403) return fazerLogout();
+            
+            const dados = await resposta.json();
+            document.getElementById('valFaturamento').innerText = `R$ ${dados.totais.faturamento.toFixed(2)}`;
+            document.getElementById('valLucro').innerText = `R$ ${dados.totais.lucroTotal.toFixed(2)}`;
+            document.getElementById('valMargem').innerText = `${dados.totais.margemMedia.toFixed(1)}%`;
+            document.getElementById('valQtdVendas').innerText = dados.totais.totalVendas;
+
+            if (dados.topProdutos && dados.topProdutos.length > 0) atualizarGrafico(dados.topProdutos);
+        }
+
+        function atualizarGrafico(produtos) {
+            const ctx = document.getElementById('graficoProdutos').getContext('2d');
+            if (meuGrafico) meuGrafico.destroy();
+            meuGrafico = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: produtos.map(p => p.nome), datasets: [{ label: 'Unidades', data: produtos.map(p => p.qtdVendida), backgroundColor: 'rgba(0, 242, 254, 0.8)' }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        socket.on('venda_realizada', carregarDashboard);
+        carregarDashboard();
+    </script>
+</body>
+</html>

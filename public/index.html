@@ -1,92 +1,141 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Painel de Gestão</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDV - Frente de Caixa</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .card { border: 1px solid #ccc; padding: 15px; width: 300px; border-radius: 8px;}
-        .lucro { color: green; font-weight: bold; }
-        .btn { padding: 10px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 8px; font-weight: bold; color: white;}
-        .btn-verde { background: #4CAF50; }
-        .btn-verde:hover { background: #45a049; }
-        .btn-laranja { background: #ff9800; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #121212; color: #e0e0e0; display: flex; flex-direction: column; align-items: center; }
+        .cabecalho { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; width: 100%; max-width: 900px; }
+        h1 { color: #ffffff; margin: 0; font-weight: 400; font-size: 1.8em; letter-spacing: 1px; }
+        .nav-links { display: flex; gap: 15px; }
+        .btn-nav { background-color: transparent; color: #00f2fe; border: 1px solid #00f2fe; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: 500; transition: all 0.3s ease; cursor: pointer; }
+        .btn-nav:hover { background-color: #00f2fe; color: #121212; box-shadow: 0 0 10px rgba(0, 242, 254, 0.3); }
+        .btn-sair { border-color: #ff4757; color: #ff4757; }
+        .btn-sair:hover { background-color: #ff4757; color: #fff; box-shadow: 0 0 10px rgba(255, 71, 87, 0.3); }
+        .container { display: flex; gap: 20px; width: 100%; max-width: 900px; }
+        .painel-venda { background: #1e1e1e; padding: 30px; border-radius: 8px; flex: 1; border-top: 2px solid #00f2fe; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .input-group { margin-bottom: 20px; }
+        label { color: #888; display: block; margin-bottom: 8px; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        input { width: 100%; padding: 15px; font-size: 1.2em; background-color: #121212; border: 1px solid #333; color: #fff; border-radius: 6px; box-sizing: border-box; transition: 0.3s; }
+        input:focus { border-color: #00f2fe; outline: none; }
+        button { cursor: pointer; border: none; border-radius: 6px; transition: 0.3s; font-size: 1.1em; }
+        .btn-vender { background-color: #00f2fe; color: #121212; padding: 15px; width: 100%; font-weight: bold; margin-top: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-vender:hover { background-color: #00d4df; }
+        .painel-log { background: #1e1e1e; padding: 20px; border-radius: 8px; flex: 1; display: flex; flex-direction: column; border-top: 2px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .titulo-log { margin-top: 0; color: #888; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #333; padding-bottom: 15px; font-weight: 600; }
+        .log-vendas { flex-grow: 1; background: #121212; color: #aaa; padding: 15px; border-radius: 6px; overflow-y: auto; max-height: 350px; font-family: 'Courier New', Courier, monospace; font-size: 1em; border: 1px solid #2a2a2a; }
+        .log-item { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #333; }
+        .sucesso { color: #00ff87; font-weight: bold; }
+        .erro { color: #fe00a1; font-weight: bold; margin-top: 15px; text-align: center; }
+        .tag-promo { background-color: #fe00a1; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; margin-left: 8px; font-weight: bold; }
+        .info-financeira { color: #00f2fe; display: block; margin-top: 5px; }
+        .info-estoque { color: #feca57; display: block; font-size: 0.9em; margin-top: 3px; }
     </style>
 </head>
 <body>
 
-    <h1>Painel de Gestão do Rafa</h1>
-    
-    <div class="card">
-        <h2 id="nome-produto">Carregando...</h2>
-        
-        <p>Preço Atual: <span id="preco-atual" style="font-weight: bold;">R$ 0.00</span> 
-           <span id="badge-promo" style="display: none; background: #ffeb3b; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #d32f2f; font-weight: bold;">PROMOÇÃO ATIVA</span>
-        </p>
-        
-        <p>Estoque Atual: <span id="estoque">--</span> unidades</p>
-        <p>Margem de Lucro: <span id="margem" class="lucro">--</span>%</p>
-        <p>Markup Aplicado: <span id="markup" class="lucro">--</span>%</p>
-        <p>Lucro (última venda): <span id="lucro" class="lucro">R$ 0.00</span></p>
-        <p id="notificacao" style="color: blue;"></p>
+    <div class="cabecalho">
+        <h1>Frente de Caixa</h1>
+        <div class="nav-links">
+            <a href="/estoque.html" class="btn-nav">Estoque</a>
+            <a href="/dashboard.html" class="btn-nav">Dashboard</a>
+            <button onclick="fazerLogout()" class="btn-nav btn-sair">Sair</button>
+        </div>
+    </div>
 
-        <hr>
-        <button id="btn-vender" class="btn btn-verde">Simular Venda</button>
-        <button id="btn-promo" class="btn btn-laranja">Ativar Promoção</button>
+    <div class="container">
+        <div class="painel-venda">
+            <div class="input-group">
+                <label for="codigo">Código do Produto (SKU)</label>
+                <input type="text" id="codigo" placeholder="Bipe ou digite o código" autofocus autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label for="quantidade">Quantidade</label>
+                <input type="number" id="quantidade" value="1" min="1">
+            </div>
+            <button class="btn-vender" id="btnVender" onclick="registrarVenda()">Registrar Venda</button>
+            <div id="mensagemErro" class="erro"></div>
+        </div>
+
+        <div class="painel-log">
+            <h3 class="titulo-log">Últimas Vendas</h3>
+            <div class="log-vendas" id="logVendas">
+                <div style="color: #555; font-style: italic;">Aguardando nova venda...</div>
+            </div>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        const token = localStorage.getItem('pdv_token');
+        if (!token) window.location.href = 'login.html';
+
+        function fazerLogout() {
+            localStorage.removeItem('pdv_token');
+            window.location.href = 'login.html';
+        }
+
         const socket = io();
+        const inputCodigo = document.getElementById('codigo');
+        const inputQuantidade = document.getElementById('quantidade');
+        const logVendas = document.getElementById('logVendas');
+        const divErro = document.getElementById('mensagemErro');
 
-        const elNome = document.getElementById('nome-produto');
-        const elPreco = document.getElementById('preco-atual');
-        const badgePromo = document.getElementById('badge-promo');
-        const elEstoque = document.getElementById('estoque');
-        const elMargem = document.getElementById('margem');
-        const elMarkup = document.getElementById('markup');
-        const elLucro = document.getElementById('lucro');
-        const elNotificacao = document.getElementById('notificacao');
-        const btnPromo = document.getElementById('btn-promo');
+        async function registrarVenda() {
+            const codigo = inputCodigo.value.trim();
+            const quantidade = parseInt(inputQuantidade.value);
 
-        function atualizarUIPromocao(emPromocao, preco) {
-            elPreco.innerText = `R$ ${preco.toFixed(2)}`;
-            if (emPromocao) {
-                badgePromo.style.display = 'inline';
-                btnPromo.innerText = "Desativar Promoção";
-                btnPromo.style.background = "#f44336";
-            } else {
-                badgePromo.style.display = 'none';
-                btnPromo.innerText = "Ativar Promoção";
-                btnPromo.style.background = "#ff9800";
+            if (!codigo) { mostrarErro("Digite um código!"); inputCodigo.focus(); return; }
+            if (quantidade < 1 || isNaN(quantidade)) { mostrarErro("Quantidade inválida!"); return; }
+
+            divErro.innerText = "";
+
+            try {
+                const resposta = await fetch('/api/vender', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ codigo, quantidade })
+                });
+
+                const resultado = await resposta.json();
+
+                if (resposta.ok) {
+                    inputCodigo.value = '';
+                    inputQuantidade.value = '1';
+                    inputCodigo.focus();
+                } else {
+                    if (resposta.status === 401 || resposta.status === 403) fazerLogout();
+                    mostrarErro(resultado.erro);
+                }
+            } catch (erro) {
+                mostrarErro("Erro de conexão.");
             }
         }
 
-        socket.on('dados_iniciais', (produto) => {
-            elNome.innerText = produto.nome;
-            elEstoque.innerText = produto.estoque;
-            atualizarUIPromocao(produto.emPromocao, produto.precoAtual);
-        });
+        function mostrarErro(mensagem) {
+            divErro.innerText = `[!] ${mensagem}`;
+            setTimeout(() => { divErro.innerText = ""; }, 3000);
+        }
 
-        socket.on('atualizacao_estoque', (dados) => {
-            elEstoque.innerText = dados.novoEstoque;
-            elLucro.innerText = `R$ ${dados.lucroGerado.toFixed(2)}`;
-            elMargem.innerText = dados.margem.toFixed(2);
-            elMarkup.innerText = dados.markup.toFixed(2);
-            elNotificacao.innerText = dados.mensagem;
-        });
+        inputCodigo.addEventListener('keypress', (e) => { if (e.key === 'Enter') registrarVenda(); });
+        inputQuantidade.addEventListener('keypress', (e) => { if (e.key === 'Enter') registrarVenda(); });
 
-        socket.on('status_promocao', (dados) => {
-            atualizarUIPromocao(dados.emPromocao, dados.precoAtual);
-            elNotificacao.innerText = "Preço atualizado no banco de dados!";
-        });
-
-        document.getElementById('btn-vender').addEventListener('click', () => {
-            fetch('http://localhost:3005/vender', { method: 'POST' });
-        });
-
-        document.getElementById('btn-promo').addEventListener('click', () => {
-            fetch('http://localhost:3005/toggle-promocao', { method: 'POST' });
+        socket.on('venda_realizada', (dados) => {
+            if (logVendas.innerHTML.includes("Aguardando nova venda")) logVendas.innerHTML = "";
+            const dataHora = new Date().toLocaleTimeString('pt-BR');
+            const tagPromocao = dados.emPromocao ? `<span class="tag-promo">PROMO</span>` : '';
+            const itemLog = document.createElement('div');
+            itemLog.className = 'log-item';
+            itemLog.innerHTML = `
+                <span style="color: #666;">[${dataHora}]</span> <span class="sucesso">${dados.nome}</span> ${tagPromocao}
+                <span class="info-financeira">> Valor: R$ ${dados.valorTotal.toFixed(2)} | Lucro: R$ ${dados.lucro.toFixed(2)}</span>
+                <span class="info-estoque">> Estoque restante: ${dados.novoEstoque} un.</span>
+            `;
+            logVendas.prepend(itemLog);
         });
     </script>
 </body>
