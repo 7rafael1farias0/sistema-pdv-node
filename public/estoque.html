@@ -2,209 +2,134 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão de Estoque - PDV</title>
+    <title>Gestão de Estoque</title>
+    <link rel="stylesheet" href="css/style.css">
     <style>
-        body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 20px; background-color: #121212; color: #e0e0e0; }
-        .cabecalho { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        h1 { color: #ffffff; margin: 0; font-weight: 400; font-size: 1.8em; letter-spacing: 1px; }
-        .nav-links { display: flex; gap: 15px; }
-        .btn-nav { background-color: transparent; color: #00f2fe; border: 1px solid #00f2fe; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-weight: 500; transition: all 0.3s ease; cursor: pointer; }
-        .btn-nav:hover { background-color: #00f2fe; color: #121212; }
-        .btn-sair { border-color: #ff4757; color: #ff4757; }
-        .btn-sair:hover { background-color: #ff4757; color: #fff; }
-        .container { display: flex; gap: 20px; flex-wrap: wrap; }
-        .card { background: #1e1e1e; padding: 25px; border-radius: 8px; flex: 1; min-width: 300px; border-top: 2px solid #00f2fe; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .card h3 { margin: 0 0 20px 0; color: #888; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
-        input { display: block; width: 100%; padding: 12px; margin: 10px 0 15px 0; background-color: #121212; border: 1px solid #333; color: #fff; border-radius: 4px; box-sizing: border-box; }
-        input:focus { border-color: #00f2fe; outline: none; }
-        button { cursor: pointer; border: none; border-radius: 4px; font-weight: bold; padding: 12px; width: 100%; transition: 0.3s; text-transform: uppercase; }
-        .btn-cadastrar { background-color: #00f2fe; color: #121212; }
-        .btn-cadastrar:hover { background-color: #00d4df; }
-        .table-container { flex: 2; min-width: 600px; background: #1e1e1e; padding: 25px; border-radius: 8px; border-top: 2px solid #333; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 15px 10px; text-align: left; border-bottom: 1px solid #2a2a2a; }
-        th { background-color: #121212; color: #888; font-size: 0.85em; text-transform: uppercase; }
-        tr:hover td { background-color: #1a1a1a; }
-        .btn-editar { background: transparent; color: #feca57; border: 1px solid #feca57; padding: 5px 10px; margin-right: 5px; border-radius: 4px; width: auto;}
-        .btn-excluir { background: transparent; color: #ff4757; border: 1px solid #ff4757; padding: 5px 10px; border-radius: 4px; width: auto;}
-        .badge-promo { padding: 5px 10px; border-radius: 12px; font-size: 0.75em; cursor: pointer; border: 1px solid transparent; width: auto;}
-        .promo-ativa { color: #00ff87; border-color: #00ff87; background: transparent; }
-        .promo-inativa { color: #555; border-color: #333; background: transparent; }
+        .input-promocao { color: #ff4757 !important; font-weight: bold; }
+        .input-custo { color: #aaa !important; }
+        tbody tr { transition: background-color 0.4s ease; }
     </style>
 </head>
 <body>
 
-    <div class="cabecalho">
-        <h1>Gestão de Estoque</h1>
-        <div class="nav-links">
-            <a href="/" class="btn-nav">Caixa</a>
-            <a href="/dashboard.html" class="btn-nav">Dashboard</a>
-            <button onclick="fazerLogout()" class="btn-nav btn-sair">Sair</button>
-        </div>
-    </div>
-
     <div class="container">
-        <div class="card">
-            <h3 id="tituloFormulario">Cadastrar Novo Produto</h3>
-            <form id="formProduto">
-                <input type="text" id="codigo" placeholder="SKU (Ex: 001)" required>
-                <input type="text" id="nome" placeholder="Nome do Produto" required>
+        <div class="nav">
+            <div class="nav-links">
+                <a href="painel.html" class="btn-nav">
+                    <span class="material-symbols-outlined icone-btn">home</span> Início
+                </a>
+            </div>
+            <h1>Gestão de Estoque</h1>
+            <button class="btn-sair" onclick="fazerLogout()">
+                <span class="material-symbols-outlined icone-btn">logout</span> Sair
+            </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="card">
+                <h3>Novo Produto</h3>
+                <input type="text" id="codigo" placeholder="SKU / Código">
+                <input type="text" id="nome" placeholder="Nome do Item">
                 <div style="display: flex; gap: 10px;">
-                    <input type="number" id="precoCusto" placeholder="Custo (R$)" step="0.01" required>
-                    <input type="number" id="precoVenda" placeholder="Venda (R$)" step="0.01" required>
+                    <input type="number" id="precoCusto" placeholder="Custo R$" step="0.01">
+                    <input type="number" id="precoVenda" placeholder="Venda R$" step="0.01">
+                    <input type="number" id="precoPromocao" placeholder="Promoção R$" step="0.01" class="input-promocao">
                 </div>
-                <input type="number" id="precoPromocao" placeholder="Promocional (Opcional)" step="0.01">
-                <input type="number" id="estoque" placeholder="Estoque Atual" required>
-                <button type="submit" class="btn-cadastrar" id="btnSubmit">Adicionar</button>
-                <button type="button" id="btnCancelar" style="display: none; background: transparent; color: #888; border: 1px solid #555; margin-top: 10px;">Cancelar</button>
-            </form>
+                <input type="number" id="estoque" placeholder="Qtd Inicial (Estoque)">
+                <button onclick="salvarProduto()" class="btn-processar" style="width: 100%;">
+                    <span class="material-symbols-outlined icone-btn">add_box</span> Cadastrar Produto
+                </button>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>
+                        <span class="material-symbols-outlined icone-btn" style="color:#aaa;">upload_file</span> Importar Lote CSV
+                    </h3>
+                    <button onclick="baixarModeloCSV()" class="btn-nav" style="font-size: 10px; border-color: #2ed573; color: #2ed573; padding: 8px 12px;">
+                        <span class="material-symbols-outlined icone-btn" style="font-size:14px;">file_download</span> Baixar Modelo
+                    </button>
+                </div>
+                <p style="font-size: 11px; color: #aaa; margin: 15px 0; line-height: 1.5;">Padrão: Código ; Nome ; Custo ; Venda ; Promoção ; Estoque</p>
+                <input type="file" id="arquivoCsv" accept=".csv" style="border: 1px dashed #333; padding: 15px; background: transparent; color: #fff; width: 100%; margin-bottom: 15px; font-size:12px;">
+                <button onclick="importarCSV()" class="btn-processar" style="width: 100%;">Processar Arquivo</button>
+            </div>
         </div>
 
-        <div class="card" style="border-top-color: #feca57; min-width: 250px; flex: initial;">
-            <h3>📥 Importar Lote (CSV)</h3>
-            <input type="file" id="arquivoCsv" accept=".csv" style="padding: 5px; cursor: pointer;">
-            <button class="btn-cadastrar" onclick="importarCSV()" style="background-color: #feca57; color: #121212; margin-top: 5px;">Processar Arquivo</button>
-        </div>
-
-        <div class="table-container">
+        <div class="card" style="overflow-x: auto;">
             <table>
                 <thead>
-                    <tr><th>SKU</th><th>Produto</th><th>Custo</th><th>Venda</th><th>Promo</th><th>Estoque</th><th>Ações</th></tr>
+                    <tr>
+                        <th>SKU</th>
+                        <th>PRODUTO</th>
+                        <th style="text-align: center; width: 90px;">CUSTO</th>
+                        <th style="text-align: center; width: 90px;">VENDA</th>
+                        <th style="text-align: center; width: 90px;">PROMO</th>
+                        <th style="text-align: center; width: 80px;">ESTOQUE</th>
+                        <th style="text-align: center; width: 120px;">AÇÕES</th>
+                    </tr>
                 </thead>
-                <tbody id="listaCorpo"></tbody>
+                <tbody id="corpoTabela"></tbody>
             </table>
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
     <script>
         const token = localStorage.getItem('pdv_token');
-        if (!token) window.location.href = 'login.html';
-
-        function fazerLogout() {
-            localStorage.removeItem('pdv_token');
-            window.location.href = 'login.html';
-        }
-
-        const socket = io();
-        const form = document.getElementById('formProduto');
-        const listaCorpo = document.getElementById('listaCorpo');
-        let idEmEdicao = null;
-
+        const cargo = localStorage.getItem('pdv_cargo');
         const authHeader = { 'Authorization': `Bearer ${token}` };
 
+        if (!token || cargo === 'vendedor') window.location.href = 'index.html';
+
+        // 1. CARREGAR LISTA (AGORA DESENHANDO ÍCONES VETORIAIS)
         async function carregarProdutos() {
-            const res = await fetch('/api/produtos', { headers: authHeader });
-            if (res.status === 401 || res.status === 403) return fazerLogout();
-            const produtos = await res.json();
-            listaCorpo.innerHTML = "";
-            produtos.forEach(p => {
-                const emPromo = p.emPromocao === 1;
-                const htmlPreco = emPromo ? `<span style="text-decoration:line-through; color:#555;">R$ ${p.precoVenda.toFixed(2)}</span> <strong style="color:#00ff87;">R$ ${p.precoPromocao.toFixed(2)}</strong>` : `R$ ${p.precoVenda.toFixed(2)}`;
-                const btnPromo = emPromo ? `<button class="badge-promo promo-ativa" onclick="alternarPromocao(${p.id})">ATIVADA</button>` : `<button class="badge-promo promo-inativa" onclick="alternarPromocao(${p.id})">INATIVA</button>`;
+            try {
+                const res = await fetch('/api/produtos', { headers: authHeader });
+                const produtos = await res.json();
                 
-                listaCorpo.innerHTML += `
-                    <tr>
-                        <td style="color:#00f2fe;">${p.codigo}</td><td>${p.nome}</td><td style="color:#aaa;">R$ ${p.precoCusto.toFixed(2)}</td>
-                        <td>${htmlPreco}</td><td>${btnPromo}</td><td>${p.estoque}</td>
-                        <td>
-                            <button class="btn-editar" onclick="prepararEdicao(${p.id}, '${p.codigo}', '${p.nome}', ${p.precoCusto}, ${p.precoVenda}, ${p.precoPromocao}, ${p.estoque})">EDITAR</button>
-                            <button class="btn-excluir" onclick="excluirProduto(${p.id})">X</button>
+                document.getElementById('corpoTabela').innerHTML = produtos.map(p => {
+                    const statusEstoque = p.estoque < 5 ? 'estoque-critico' : '';
+                    
+                    // Lógica do Botão de Promoção Vetorial
+                    const btnPromoClass = p.emPromocao === 1 ? 'btn-processar' : 'btn-nav';
+                    // Se estiver ativa, preenchemos o ícone da estrela (FILL 1)
+                    const promoIconStyle = p.emPromocao === 1 ? 'font-variation-settings: \'FILL\' 1;' : '';
+                    const promoVisor = p.precoPromocao > 0 ? p.precoPromocao : p.precoVenda;
+
+                    return `
+                    <tr id="linha-${p.id}">
+                        <td style="color: #666; font-size: 11px; font-family: monospace;">${p.codigo}</td>
+                        <td style="font-weight: bold; color: #fff;">
+                            ${p.nome.toUpperCase()} 
+                            ${p.emPromocao === 1 ? '<span style="color:#ff4757; font-size:10px; margin-left:5px; font-weight:normal;">(PROMO)</span>' : ''}
+                        </td>
+                        <td style="text-align: center;"><input type="number" step="0.01" value="${p.precoCusto}" id="pc-${p.id}" class="input-tabela input-custo" onchange="atualizarProduto(${p.id})"></td>
+                        <td style="text-align: center;"><input type="number" step="0.01" value="${p.precoVenda}" id="pv-${p.id}" class="input-tabela" style="color: #00f2fe;" onchange="atualizarProduto(${p.id})"></td>
+                        <td style="text-align: center;"><input type="number" step="0.01" value="${promoVisor}" id="pp-${p.id}" class="input-tabela input-promocao" onchange="atualizarProduto(${p.id})"></td>
+                        <td style="text-align: center;"><input type="number" value="${p.estoque}" id="est-${p.id}" class="input-tabela ${statusEstoque}" onchange="atualizarProduto(${p.id})"></td>
+                        
+                        <td style="text-align: center; display: flex; gap: 5px; justify-content: center;">
+                            <button class="${btnPromoClass}" onclick="alternarPromocao(${p.id})" style="padding: 7px;" title="Ligar/Desligar Promoção">
+                                <span class="material-symbols-outlined" style="font-size: 16px; ${promoIconStyle}">star</span>
+                            </button>
+                            <button class="btn-sair" onclick="excluirProduto(${p.id})" style="padding: 7px;" title="Excluir Produto">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+                            </button>
                         </td>
                     </tr>`;
-            });
+                }).join('');
+            } catch (e) { console.error("Erro ao carregar:", e); }
         }
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const dados = {
-                codigo: document.getElementById('codigo').value, nome: document.getElementById('nome').value,
-                precoCusto: parseFloat(document.getElementById('precoCusto').value), precoVenda: parseFloat(document.getElementById('precoVenda').value),
-                precoPromocao: parseFloat(document.getElementById('precoPromocao').value) || parseFloat(document.getElementById('precoVenda').value),
-                estoque: parseInt(document.getElementById('estoque').value)
-            };
-            const url = idEmEdicao ? `/api/produtos/${idEmEdicao}` : '/api/produtos';
-            const metodo = idEmEdicao ? 'PUT' : 'POST';
-
-            await fetch(url, { method: metodo, headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(dados) });
-            form.reset(); idEmEdicao = null; document.getElementById('btnCancelar').style.display = "none";
-        });
-
-        window.prepararEdicao = (id, c, n, pc, pv, pp, e) => {
-            idEmEdicao = id; document.getElementById('codigo').value = c; document.getElementById('nome').value = n;
-            document.getElementById('precoCusto').value = pc; document.getElementById('precoVenda').value = pv;
-            document.getElementById('precoPromocao').value = pp; document.getElementById('estoque').value = e;
-            document.getElementById('btnCancelar').style.display = "block";
-        };
-
-        document.getElementById('btnCancelar').addEventListener('click', () => { form.reset(); idEmEdicao = null; document.getElementById('btnCancelar').style.display = "none"; });
-
-        window.alternarPromocao = async (id) => await fetch(`/api/produtos/${id}/promocao`, { method: 'PUT', headers: authHeader });
-        window.excluirProduto = async (id) => { if(confirm("Excluir?")) await fetch(`/api/produtos/${id}`, { method: 'DELETE', headers: authHeader }); };
-
-        window.importarCSV = async () => {
-            const input = document.getElementById('arquivoCsv');
-            if (!input.files[0]) return alert("⚠️ Selecione um ficheiro CSV primeiro!");
-            
-            const leitor = new FileReader();
-            leitor.onload = async function(e) {
-                const linhas = e.target.result.split('\n');
-                const produtosParaEnviar = [];
-                
-                // Pula a primeira linha (cabeçalho) e processa as seguintes
-                for (let i = 1; i < linhas.length; i++) {
-                    const l = linhas[i].trim(); 
-                    if (l === '') continue;
-                    
-                    // Deteta se usa vírgula ou ponto e vírgula
-                    const separador = l.includes(';') ? ';' : ',';
-                    const c = l.split(separador);
-                    
-                    if (c.length >= 5) {
-                        produtosParaEnviar.push({ 
-                            codigo: c[0].trim(), 
-                            nome: c[1].trim(), 
-                            precoCusto: parseFloat(c[2].trim()), // Garante que é número
-                            precoVenda: parseFloat(c[3].trim()), 
-                            estoque: parseInt(c[4].trim()) 
-                        });
-                    }
-                }
-                
-                if (produtosParaEnviar.length > 0) {
-                    try {
-                        console.log("A enviar produtos para o backend:", produtosParaEnviar);
-                        
-                        const res = await fetch('/api/produtos/lote', { 
-                            method: 'POST', 
-                            headers: { 
-                                'Content-Type': 'application/json', 
-                                'Authorization': `Bearer ${token}` // O Crachá JWT vai aqui!
-                            }, 
-                            body: JSON.stringify({ produtos: produtosParaEnviar }) 
-                        });
-                        
-                        if (res.ok) {
-                            alert(`✅ ${produtosParaEnviar.length} produtos importados com sucesso!`); 
-                            input.value = "";
-                            carregarProdutos();
-                        } else {
-                            const erroBackend = await res.json();
-                            alert(`❌ O servidor recusou a inserção: ${erroBackend.erro || erroBackend.message || 'Erro desconhecido'}`);
-                        }
-                    } catch (erro) {
-                        alert("❌ Erro de comunicação com a API (veja a consola F12).");
-                        console.error("Erro no fetch:", erro);
-                    }
-                } else {
-                    alert("⚠️ O ficheiro parece estar vazio ou no formato errado.");
-                }
-            };
-            leitor.readAsText(input.files[0], 'UTF-8');
-        };
-
-        socket.on('atualizacao_geral', carregarProdutos); socket.on('venda_realizada', carregarProdutos);
+        // ... (Mantenha o resto das funções JS iguazinhas: alternarPromocao, atualizarProduto, salvarProduto, excluirProduto, importarCSV, baixarModeloCSV, fazerLogout) ...
+        async function alternarPromocao(id) { try { const res = await fetch(`/api/produtos/${id}/promocao`, { method: 'PUT', headers: authHeader }); if (res.ok) carregarProdutos(); else alert("❌ Apenas gerentes podem alterar status de promoção."); } catch (e) { console.error(e); } }
+        async function atualizarProduto(id) { const dados = { estoque: parseInt(document.getElementById(`est-${id}`).value) || 0, precoCusto: parseFloat(document.getElementById(`pc-${id}`).value) || 0, precoVenda: parseFloat(document.getElementById(`pv-${id}`).value) || 0, precoPromocao: parseFloat(document.getElementById(`pp-${id}`).value) || 0 }; const res = await fetch(`/api/produtos/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(dados) }); if (res.ok) { const linha = document.getElementById(`linha-${id}`); linha.style.backgroundColor = "rgba(46, 213, 115, 0.1)"; setTimeout(() => { linha.style.backgroundColor = "transparent"; }, 800); } else { alert("❌ Erro ao salvar."); } }
+        async function salvarProduto() { const dados = { codigo: document.getElementById('codigo').value, nome: document.getElementById('nome').value, precoCusto: parseFloat(document.getElementById('precoCusto').value) || 0, precoVenda: parseFloat(document.getElementById('precoVenda').value) || 0, precoPromocao: parseFloat(document.getElementById('precoPromocao').value) || 0, estoque: parseInt(document.getElementById('estoque').value) || 0 }; if(!dados.codigo || !dados.nome) return alert("⚠️ Preencha Código e Nome!"); const res = await fetch('/api/produtos', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(dados) }); if (res.ok) { alert("✅ Produto Cadastrado!"); location.reload(); } }
+        async function excluirProduto(id) { if(!confirm("⚠️ Tem certeza que deseja apagar este produto?")) return; const res = await fetch(`/api/produtos/${id}`, { method: 'DELETE', headers: authHeader }); if (res.ok) carregarProdutos(); }
+        async function importarCSV() { const input = document.getElementById('arquivoCsv'); if (!input.files[0]) return alert("⚠️ Selecione o arquivo CSV!"); const leitor = new FileReader(); leitor.onload = async (e) => { const linhas = e.target.result.split('\n').slice(1); const produtos = linhas.map(l => { const c = l.split(l.includes(';') ? ';' : ','); if (c.length < 6) return null; return { codigo: c[0].trim(), nome: c[1].trim(), precoCusto: parseFloat(c[2].trim().replace(',','.')) || 0, precoVenda: parseFloat(c[3].trim().replace(',','.')) || 0, precoPromocao: parseFloat(c[4].trim().replace(',','.')) || 0, estoque: parseInt(c[5].trim()) || 0 }; }).filter(p => p); if(produtos.length === 0) return alert("❌ Arquivo fora do formato."); const res = await fetch('/api/produtos/lote', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify({ produtos }) }); if(res.ok){ alert("✅ Lote Processado!"); carregarProdutos(); input.value = ""; } }; leitor.readAsText(input.files[0], 'UTF-8'); }
+        function baixarModeloCSV() { const conteudoCSV = "Código;Nome;Custo;Venda;Promoção;Estoque\nEX001;Produto Exemplo;10.50;25.00;22.90;100\nEX002;Outro Exemplo;5.00;15.00;15.00;50"; const blob = new Blob([conteudoCSV], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); const url = URL.createObjectURL(blob); link.setAttribute("href", url); link.setAttribute("download", "modelo_importacao_pdv.csv"); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
+        function fazerLogout() { localStorage.clear(); window.location.href = 'login.html'; }
+        
         carregarProdutos();
     </script>
 </body>

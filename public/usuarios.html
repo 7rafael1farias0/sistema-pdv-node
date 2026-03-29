@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Equipe</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        select { background: #050505; border: 1px solid var(--border-color); color: #fff; padding: 12px 15px; width: 100%; border-radius: 4px; font-size: 15px; outline: none; transition: 0.3s; font-family: 'Roboto', sans-serif; appearance: none; }
+        select:focus { border-color: var(--azul-neon); box-shadow: 0 0 10px rgba(0, 242, 254, 0.1); }
+        .badge { padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+        .badge-gerente { background: rgba(255, 71, 87, 0.1); color: var(--vermelho-alert); border: 1px solid var(--vermelho-alert); }
+        .badge-vendedor { background: rgba(0, 242, 254, 0.1); color: var(--azul-neon); border: 1px solid var(--azul-neon); }
+        .badge-estoquista { background: rgba(46, 213, 115, 0.1); color: var(--verde-ok); border: 1px solid var(--verde-ok); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="nav">
+            <div class="nav-links">
+                <a href="painel.html" class="btn-nav">
+                    <span class="material-symbols-outlined icone-btn">home</span> Início
+                </a>
+            </div>
+            <h1>Gestão de Equipe</h1>
+            <button class="btn-sair" onclick="fazerLogout()">
+                <span class="material-symbols-outlined icone-btn">logout</span> Sair
+            </button>
+        </div>
+
+        <div class="card">
+            <h3>Novo Acesso</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: center; margin-top: 15px;">
+                <input type="text" id="novoUsuario" placeholder="Nome de Usuário" style="margin-bottom: 0;">
+                <input type="password" id="novaSenha" placeholder="Senha de Acesso" style="margin-bottom: 0;">
+                <select id="novoCargo" style="margin-bottom: 0;">
+                    <option value="vendedor">Vendedor (Frente de Caixa)</option>
+                    <option value="estoquista">Estoquista (Inventário)</option>
+                    <option value="gerente">Gerente (Acesso Total)</option>
+                </select>
+                <button onclick="criarUsuario()" class="btn-processar" style="margin: 0; padding: 12px 24px; height: 100%; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-symbols-outlined icone-btn">person_add</span> CRIAR LOGIN
+                </button>
+            </div>
+        </div>
+
+        <div class="card" style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>USUÁRIO</th>
+                        <th style="text-align: center;">NÍVEL DE ACESSO (CARGO)</th>
+                        <th style="text-align: center;">AÇÕES</th>
+                    </tr>
+                </thead>
+                <tbody id="listaUsuarios"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('pdv_token');
+        const cargoAtual = localStorage.getItem('pdv_cargo');
+        const authHeader = { 'Authorization': `Bearer ${token}` };
+
+        if (!token || cargoAtual !== 'gerente') { alert("⚠️ Acesso restrito a Gerentes."); window.location.href = 'painel.html'; }
+
+        async function carregarUsuarios() {
+            try {
+                const res = await fetch('/api/usuarios', { headers: authHeader });
+                const usuarios = await res.json();
+                
+                document.getElementById('listaUsuarios').innerHTML = usuarios.map(u => {
+                    let badgeClass = '';
+                    if (u.cargo === 'gerente') badgeClass = 'badge-gerente';
+                    else if (u.cargo === 'vendedor') badgeClass = 'badge-vendedor';
+                    else if (u.cargo === 'estoquista') badgeClass = 'badge-estoquista';
+
+                    return `
+                    <tr>
+                        <td style="color: #fff; font-weight: bold; font-size: 15px;">@${u.usuario}</td>
+                        <td style="text-align: center;"><span class="badge ${badgeClass}">${u.cargo}</span></td>
+                        <td style="text-align: center;">
+                            <button class="btn-sair" onclick="excluirUsuario(${u.id})" style="padding: 7px;" title="Excluir Usuário">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+                            </button>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch (erro) { console.error("Erro:", erro); }
+        }
+
+        async function criarUsuario() {
+            const usuario = document.getElementById('novoUsuario').value.trim();
+            const senha = document.getElementById('novaSenha').value.trim();
+            const cargo = document.getElementById('novoCargo').value;
+            if (!usuario || !senha) return alert("⚠️ Preencha usuário e senha!");
+
+            try {
+                const res = await fetch('/api/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify({ usuario, senha, cargo }) });
+                if (res.ok) { alert("✅ Novo membro da equipe cadastrado!"); document.getElementById('novoUsuario').value = ''; document.getElementById('novaSenha').value = ''; carregarUsuarios(); } 
+                else { const erro = await res.json(); alert(`❌ Erro: ${erro.erro}`); }
+            } catch (erro) { alert("❌ Falha na conexão."); }
+        }
+
+        async function excluirUsuario(id) {
+            if (!confirm("⚠️ Tem certeza que deseja remover este acesso do sistema?")) return;
+            try {
+                const res = await fetch(`/api/usuarios/${id}`, { method: 'DELETE', headers: authHeader });
+                if (res.ok) carregarUsuarios();
+                else { const erro = await res.json(); alert(`❌ Erro: ${erro.erro}`); }
+            } catch (erro) { alert("❌ Falha na conexão."); }
+        }
+
+        function fazerLogout() { localStorage.clear(); window.location.href = 'login.html'; }
+        
+        carregarUsuarios();
+    </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Central do Sistema</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="container">
+        
+        <div class="nav">
+            <div>
+                <h1>Central do Sistema</h1>
+                <p class="desc" id="boasVindas">Carregando...</p>
+            </div>
+            <button class="btn-sair" onclick="fazerLogout()">
+                <span class="material-symbols-outlined icone-btn">logout</span> Sair do Sistema
+            </button>
+        </div>
+
+        <div class="grid-modulos">
+            <a href="index.html" id="modCaixa">
+                <div class="card-modulo">
+                    <span class="material-symbols-outlined icone-g">point_of_sale</span>
+                    <h2>Painel de Vendas</h2>
+                    <p class="desc">Vendas, bipagem e transações.</p>
+                </div>
+            </a>
+            
+            <a href="estoque.html" id="modEstoque">
+                <div class="card-modulo">
+                    <span class="material-symbols-outlined icone-g">inventory_2</span>
+                    <h2>Gestão de Estoque</h2>
+                    <p class="desc">Inventário, edição e importação CSV.</p>
+                </div>
+            </a>
+            
+            <a href="dashboard.html" id="modDash">
+                <div class="card-modulo">
+                    <span class="material-symbols-outlined icone-g">query_stats</span>
+                    <h2>Relatórios & Dash</h2>
+                    <p class="desc">Performance de vendas e exportação.</p>
+                </div>
+            </a>
+            
+            <a href="usuarios.html" id="modEquipe">
+                <div class="card-modulo">
+                    <span class="material-symbols-outlined icone-g">manage_accounts</span>
+                    <h2>Gestão de Equipe</h2>
+                    <p class="desc">Controle de acessos e permissões.</p>
+                </div>
+            </a>
+        </div>
+
+    </div>
+
+    <script>
+        const cargo = localStorage.getItem('pdv_cargo');
+        if (!localStorage.getItem('pdv_token')) window.location.href = 'login.html';
+
+        document.getElementById('boasVindas').innerText = `ACESSO: ${cargo.toUpperCase()}`;
+
+        if (cargo === 'vendedor') {
+            document.getElementById('modEstoque').style.display = 'none';
+            document.getElementById('modDash').style.display = 'none';
+            document.getElementById('modEquipe').style.display = 'none';
+        }
+        if (cargo === 'estoquista') {
+            document.getElementById('modCaixa').style.display = 'none';
+            document.getElementById('modDash').style.display = 'none';
+            document.getElementById('modEquipe').style.display = 'none';
+        }
+        function fazerLogout() { localStorage.clear(); window.location.href = 'login.html'; }
+    </script>
+</body>
+</html>

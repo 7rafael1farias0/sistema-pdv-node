@@ -1,224 +1,236 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
 const http = require('http');
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const fs = require('fs');
-const path = require('path');
-
-// Garante que a pasta database existe para o SQLite não dar erro no Deploy
-const dir = './database';
-if (!fs.existsSync(dir)){
-    fs.mkdirSync(dir);
-}
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { cors: { origin: '*' } });
 
+app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const SEGREDO_JWT = 'pdv-secreto-rafa-2026';
-
-// Conexão com o Banco de Dados
-const db = new sqlite3.Database('./database/estoque.db', (err) => {
-    if (err) console.error("Erro ao conectar ao banco:", err.message);
-    else console.log("Conectado ao banco de dados SQLite.");
-});
-
-// Criação das Tabelas
-db.serialize(() => {
-    // Tabela de Produtos
-    db.run(`CREATE TABLE IF NOT EXISTS produtos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        codigo TEXT UNIQUE,
-        nome TEXT,
-        precoCusto REAL,
-        precoVenda REAL,
-        precoPromocao REAL,
-        estoque INTEGER,
-        emPromocao INTEGER DEFAULT 0
-    )`);
-
-    // Tabela de Vendas (Histórico)
-    db.run(`CREATE TABLE IF NOT EXISTS vendas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        produto_id INTEGER,
-        quantidade INTEGER,
-        valorTotal REAL,
-        lucro REAL,
-        margem REAL,
-        data_venda DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(produto_id) REFERENCES produtos(id)
-    )`);
-
-    // Tabela de Usuários
-    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario TEXT UNIQUE,
-        senha TEXT
-    )`, () => {
-        db.get("SELECT * FROM usuarios WHERE usuario = 'admin'", [], (err, row) => {
-            if (!row) {
-                const senhaCriptografada = bcrypt.hashSync('123456', 8);
-                db.run("INSERT INTO usuarios (usuario, senha) VALUES (?, ?)", ['admin', senhaCriptografada]);
-            }
-        });
-    });
-});
+const SECRET = 'chave_super_secreta_pdv';
 
 // ==========================================
-// LOGIN E SEGURANÇA
+// ☁️ CONEXÃO COM O BANCO DE DADOS POSTGRESQL
 // ==========================================
-app.post('/api/login', (req, res) => {
-    const { usuario, senha } = req.body;
-    db.get("SELECT * FROM usuarios WHERE usuario = ?", [usuario], (err, user) => {
-        if (err || !user || !bcrypt.compareSync(senha, user.senha)) {
-            return res.status(401).json({ erro: "Usuário ou senha incorretos" });
+// Se estiver no Render, ele usa a URL da nuvem. Se estiver no seu PC, ele pode rodar local (se você configurar) ou dar erro.
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:senha@localhost:5432/pdv',
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false // Exigência do Render gratuito
+});
+
+// Inicialização das Tabelas no Postgres
+const initDB = async () => {
+    try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario VARCHAR(255) UNIQUE, senha VARCHAR(255), cargo VARCHAR(50))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS produtos (id SERIAL PRIMARY KEY, codigo VARCHAR(255) UNIQUE, nome VARCHAR(255), precoCusto DECIMAL(10,2), precoVenda DECIMAL(10,2), precoPromocao DECIMAL(10,2), emPromocao INTEGER DEFAULT 0, estoque INTEGER)`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS vendas (id SERIAL PRIMARY KEY, total DECIMAL(10,2), lucro DECIMAL(10,2), data TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+        
+        const adminCheck = await pool.query("SELECT * FROM usuarios WHERE usuario = 'admin'");
+        if (adminCheck.rows.length === 0) {
+            await pool.query("INSERT INTO usuarios (usuario, senha, cargo) VALUES ($1, $2, $3)", ['admin', '123456', 'gerente']);
+            console.log("👑 Usuário admin padrão recriado na nuvem.");
         }
-        const token = jwt.sign({ id: user.id, usuario: user.usuario }, SEGREDO_JWT, { expiresIn: '8h' });
-        res.json({ mensagem: "Sucesso", token });
-    });
-});
+        console.log("✅ Banco de dados conectado e tabelas verificadas.");
+    } catch (err) {
+        console.error("❌ Erro ao criar tabelas no Postgres:", err);
+    }
+};
+initDB();
 
-const verificarToken = (req, res, next) => {
-    // Aceita token pelo Header ou pela URL (para o caso do download do CSV)
-    const tokenHeader = req.headers['authorization'];
-    const tokenQuery = req.query.token;
-    
-    let tokenLimpo = null;
-    if (tokenHeader) tokenLimpo = tokenHeader.split(' ')[1];
-    else if (tokenQuery) tokenLimpo = tokenQuery;
-
-    if (!tokenLimpo) return res.status(403).json({ erro: "Acesso negado. Faça login." });
-
-    jwt.verify(tokenLimpo, SEGREDO_JWT, (err, decoded) => {
-        if (err) return res.status(401).json({ erro: "Token inválido ou expirado." });
-        req.usuarioId = decoded.id;
+// ==========================================
+// 🛡️ MIDDLEWARES E SEGURANÇA
+// ==========================================
+function verificarToken(req, res, next) {
+    const token = req.headers['authorization'];
+    if (!token) return res.status(401).json({ erro: "Acesso negado" });
+    jwt.verify(token.split(' ')[1], SECRET, (err, decoded) => {
+        if (err) return res.status(401).json({ erro: "Token inválido" });
+        req.usuario = decoded;
         next();
     });
-};
+}
+
+function permitirCargos(cargosPermitidos) {
+    return (req, res, next) => {
+        if (!cargosPermitidos.includes(req.usuario.cargo)) return res.status(403).json({ erro: "Sem permissão" });
+        next();
+    };
+}
 
 // ==========================================
-// ROTAS DE PRODUTOS E ESTOQUE
+// 🔑 ROTAS DE LOGIN E USUÁRIOS
 // ==========================================
-app.get('/api/produtos', verificarToken, (req, res) => {
-    db.all("SELECT * FROM produtos", [], (err, rows) => {
-        if (err) return res.status(500).json({erro: err.message});
-        res.json(rows);
-    });
+app.post('/api/login', async (req, res) => {
+    const { usuario, senha } = req.body;
+    try {
+        const result = await pool.query("SELECT * FROM usuarios WHERE usuario = $1 AND senha = $2", [usuario, senha]);
+        if (result.rows.length > 0) {
+            const user = result.rows[0];
+            const token = jwt.sign({ id: user.id, cargo: user.cargo }, SECRET, { expiresIn: '8h' });
+            res.json({ token, cargo: user.cargo });
+        } else {
+            res.status(401).json({ erro: "Credenciais inválidas" });
+        }
+    } catch (err) { res.status(500).json({ erro: "Erro no servidor" }); }
 });
 
-app.post('/api/produtos', verificarToken, (req, res) => {
-    const { codigo, nome, precoCusto, precoVenda, precoPromocao, estoque } = req.body;
-    db.run(`INSERT INTO produtos (codigo, nome, precoCusto, precoVenda, precoPromocao, estoque) VALUES (?, ?, ?, ?, ?, ?)`,
-        [codigo, nome, precoCusto, precoVenda, precoPromocao, estoque], function(err) {
-            if (err) return res.status(400).json({erro: "Código já cadastrado!"});
-            io.emit('atualizacao_geral');
-            res.json({ id: this.lastID });
-    });
+app.get('/api/usuarios', verificarToken, permitirCargos(['gerente']), async (req, res) => {
+    try {
+        const result = await pool.query("SELECT id, usuario, cargo FROM usuarios");
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ erro: "Erro ao buscar equipe" }); }
 });
 
-app.put('/api/produtos/:id', verificarToken, (req, res) => {
-    const { codigo, nome, precoCusto, precoVenda, precoPromocao, estoque } = req.body;
-    db.run(`UPDATE produtos SET codigo = ?, nome = ?, precoCusto = ?, precoVenda = ?, precoPromocao = ?, estoque = ? WHERE id = ?`,
-        [codigo, nome, precoCusto, precoVenda, precoPromocao, estoque, req.params.id], function(err) {
-            if (err) return res.status(500).json({erro: err.message});
-            io.emit('atualizacao_geral');
-            res.json({ mensagem: "Atualizado com sucesso" });
-    });
+app.post('/api/usuarios', verificarToken, permitirCargos(['gerente']), async (req, res) => {
+    const { usuario, senha, cargo } = req.body;
+    try {
+        await pool.query("INSERT INTO usuarios (usuario, senha, cargo) VALUES ($1, $2, $3)", [usuario, senha, cargo]);
+        res.json({ mensagem: "Usuário criado!" });
+    } catch (err) { res.status(400).json({ erro: "Usuário já existe ou erro de banco" }); }
 });
 
-app.put('/api/produtos/:id/promocao', verificarToken, (req, res) => {
-    db.run(`UPDATE produtos SET emPromocao = CASE WHEN emPromocao = 1 THEN 0 ELSE 1 END WHERE id = ?`, [req.params.id], function(err) {
-        if (err) return res.status(500).json({erro: err.message});
-        io.emit('atualizacao_geral');
-        res.json({ mensagem: "Promoção alterada" });
-    });
-});
-
-app.delete('/api/produtos/:id', verificarToken, (req, res) => {
-    db.run(`DELETE FROM produtos WHERE id = ?`, [req.params.id], function(err) {
-        if (err) return res.status(500).json({erro: err.message});
-        io.emit('atualizacao_geral');
+app.delete('/api/usuarios/:id', verificarToken, permitirCargos(['gerente']), async (req, res) => {
+    if (parseInt(req.params.id) === req.usuario.id) return res.status(400).json({ erro: "Você não pode excluir a si mesmo!" });
+    try {
+        await pool.query("DELETE FROM usuarios WHERE id = $1", [req.params.id]);
         res.json({ mensagem: "Excluído com sucesso" });
-    });
+    } catch (err) { res.status(500).json({ erro: "Erro ao excluir" }); }
 });
 
-app.post('/api/produtos/lote', verificarToken, (req, res) => {
+// ==========================================
+// 📦 ROTAS DE PRODUTOS (ESTOQUE)
+// ==========================================
+app.get('/api/produtos', verificarToken, async (req, res) => {
+    try {
+        const result = await pool.query("SELECT * FROM produtos ORDER BY nome ASC");
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ erro: "Erro ao buscar produtos" }); }
+});
+
+app.post('/api/produtos', verificarToken, permitirCargos(['gerente', 'estoquista']), async (req, res) => {
+    const { codigo, nome, precoCusto, precoVenda, precoPromocao, estoque } = req.body;
+    const promoFinal = (precoPromocao && precoPromocao > 0) ? precoPromocao : precoVenda;
+    const emPromocao = promoFinal < precoVenda ? 1 : 0;
+    
+    try {
+        await pool.query("INSERT INTO produtos (codigo, nome, precoCusto, precoVenda, precoPromocao, emPromocao, estoque) VALUES ($1,$2,$3,$4,$5,$6,$7)", 
+        [codigo, nome, precoCusto, precoVenda, promoFinal, emPromocao, estoque]);
+        io.emit('atualizacao_geral');
+        res.json({ mensagem: "Produto Salvo!" });
+    } catch (err) { res.status(500).json({ erro: "Código já existe ou erro no servidor" }); }
+});
+
+app.put('/api/produtos/:id', verificarToken, permitirCargos(['gerente', 'estoquista']), async (req, res) => {
+    const estoque = parseInt(req.body.estoque) || 0;
+    const precoCusto = parseFloat(req.body.precoCusto) || 0;
+    const precoVenda = parseFloat(req.body.precoVenda) || 0;
+    const precoPromocao = parseFloat(req.body.precoPromocao) || precoVenda;
+    const emPromocao = precoPromocao < precoVenda ? 1 : 0;
+    
+    try {
+        await pool.query("UPDATE produtos SET estoque = $1, precoCusto = $2, precoVenda = $3, precoPromocao = $4, emPromocao = $5 WHERE id = $6", 
+        [estoque, precoCusto, precoVenda, precoPromocao, emPromocao, req.params.id]);
+        io.emit('atualizacao_geral');
+        res.json({ mensagem: "Atualizado!" });
+    } catch (err) { res.status(500).json({ erro: "Erro ao atualizar" }); }
+});
+
+app.put('/api/produtos/:id/promocao', verificarToken, permitirCargos(['gerente']), async (req, res) => {
+    try {
+        const result = await pool.query("SELECT emPromocao FROM produtos WHERE id = $1", [req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ erro: "Produto não encontrado" });
+        
+        const novoStatus = result.rows[0].empromocao === 1 ? 0 : 1;
+        await pool.query("UPDATE produtos SET emPromocao = $1 WHERE id = $2", [novoStatus, req.params.id]);
+        io.emit('atualizacao_geral');
+        res.json({ mensagem: "Status alterado!" });
+    } catch (err) { res.status(500).json({ erro: "Erro de banco" }); }
+});
+
+app.delete('/api/produtos/:id', verificarToken, permitirCargos(['gerente', 'estoquista']), async (req, res) => {
+    try {
+        await pool.query("DELETE FROM produtos WHERE id = $1", [req.params.id]);
+        io.emit('atualizacao_geral');
+        res.json({ mensagem: "Excluído!" });
+    } catch (err) { res.status(500).json({ erro: "Erro ao excluir" }); }
+});
+
+// Importação CSV em Lote
+app.post('/api/produtos/lote', verificarToken, permitirCargos(['gerente', 'estoquista']), async (req, res) => {
     const { produtos } = req.body;
-    if (!produtos || !produtos.length) return res.status(400).json({erro: "Nenhum produto enviado"});
-
-    db.serialize(() => {
-        const stmt = db.prepare(`INSERT INTO produtos (codigo, nome, precoCusto, precoVenda, precoPromocao, estoque) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(codigo) DO UPDATE SET nome=excluded.nome, precoCusto=excluded.precoCusto, precoVenda=excluded.precoVenda, precoPromocao=excluded.precoPromocao, estoque = produtos.estoque + excluded.estoque`);
-        produtos.forEach(p => {
-            const promo = p.precoPromocao || p.precoVenda;
-            stmt.run(p.codigo, p.nome, parseFloat(p.precoCusto), parseFloat(p.precoVenda), parseFloat(promo), parseInt(p.estoque));
-        });
-        stmt.finalize();
-    });
-    io.emit('atualizacao_geral');
-    res.json({ mensagem: "Processado com sucesso" });
-});
-
-// ==========================================
-// FRENTE DE CAIXA E DASHBOARD
-// ==========================================
-app.post('/api/vender', verificarToken, (req, res) => {
-    const { codigo, quantidade } = req.body;
-
-    db.get(`SELECT * FROM produtos WHERE codigo = ?`, [codigo], (err, produto) => {
-        if (!produto) return res.status(404).json({ erro: "Produto não encontrado!" });
-        if (produto.estoque < quantidade) return res.status(400).json({ erro: "Estoque insuficiente!" });
-
-        const precoFinal = produto.emPromocao ? produto.precoPromocao : produto.precoVenda;
-        const valorTotal = precoFinal * quantidade;
-        const custoTotal = produto.precoCusto * quantidade;
-        const lucro = valorTotal - custoTotal;
-        const margem = valorTotal > 0 ? (lucro / valorTotal) * 100 : 0;
-        const novoEstoque = produto.estoque - quantidade;
-
-        db.serialize(() => {
-            db.run(`UPDATE produtos SET estoque = ? WHERE id = ?`, [novoEstoque, produto.id]);
-            db.run(`INSERT INTO vendas (produto_id, quantidade, valorTotal, lucro, margem) VALUES (?, ?, ?, ?, ?)`,
-                [produto.id, quantidade, valorTotal, lucro, margem]);
+    try {
+        for (const p of produtos) {
+            const promoFinal = (p.precoPromocao && p.precoPromocao > 0) ? p.precoPromocao : p.precoVenda;
+            const emPromocao = promoFinal < p.precoVenda ? 1 : 0;
             
-            io.emit('venda_realizada', { 
-                nome: produto.nome, valorTotal, lucro, margem, novoEstoque, emPromocao: produto.emPromocao 
-            });
-            res.json({ mensagem: "Venda registrada com sucesso" });
-        });
-    });
+            // Faz Inserção ou Atualização se o código já existir
+            await pool.query(
+                `INSERT INTO produtos (codigo, nome, precoCusto, precoVenda, precoPromocao, emPromocao, estoque) 
+                 VALUES ($1,$2,$3,$4,$5,$6,$7) 
+                 ON CONFLICT (codigo) DO UPDATE SET 
+                 precoCusto=EXCLUDED.precoCusto, precoVenda=EXCLUDED.precoVenda, precoPromocao=EXCLUDED.precoPromocao, emPromocao=EXCLUDED.emPromocao, estoque=EXCLUDED.estoque`,
+                [p.codigo, p.nome, p.precoCusto, p.precoVenda, promoFinal, emPromocao, p.estoque]
+            );
+        }
+        io.emit('atualizacao_geral');
+        res.json({ mensagem: "Importação concluída" });
+    } catch (err) { res.status(500).json({ erro: "Erro ao processar lote CSV" }); }
 });
 
-app.get('/api/relatorios', verificarToken, (req, res) => {
-    const dashboard = { totais: {}, topProdutos: [] };
-
-    db.get(`SELECT COALESCE(SUM(valorTotal), 0) as faturamento, COALESCE(SUM(lucro), 0) as lucroTotal, COALESCE(AVG(margem), 0) as margemMedia, COUNT(id) as totalVendas FROM vendas`, [], (err, totais) => {
-        dashboard.totais = totais;
-
-        db.all(`SELECT p.nome, SUM(v.quantidade) as qtdVendida FROM vendas v JOIN produtos p ON v.produto_id = p.id GROUP BY p.id ORDER BY qtdVendida DESC LIMIT 5`, [], (err, produtos) => {
-            dashboard.topProdutos = produtos;
-            res.json(dashboard);
-        });
-    });
+// ==========================================
+// 💸 ROTAS DO CAIXA E DASHBOARD
+// ==========================================
+app.post('/api/vendas', verificarToken, permitirCargos(['gerente', 'vendedor']), async (req, res) => {
+    const { total, lucro, itens } = req.body;
+    try {
+        // Registra a venda financeira
+        await pool.query("INSERT INTO vendas (total, lucro) VALUES ($1, $2)", [total, lucro]);
+        
+        // Baixa o estoque de cada item
+        for (const item of itens) {
+            await pool.query("UPDATE produtos SET estoque = estoque - $1 WHERE codigo = $2", [item.qtd, item.codigo]);
+        }
+        
+        io.emit('atualizacao_geral');
+        res.json({ mensagem: "Venda concluída!" });
+    } catch (err) { res.status(500).json({ erro: "Erro ao fechar venda" }); }
 });
 
-app.get('/api/exportar-vendas', verificarToken, (req, res) => {
-    db.all(`SELECT v.id, p.codigo, p.nome, v.quantidade, v.valorTotal, v.lucro, v.margem, v.data_venda FROM vendas v JOIN produtos p ON v.produto_id = p.id ORDER BY v.id DESC`, [], (err, rows) => {
-        if (err) return res.status(500).send("Erro");
-        let csv = "ID da Venda;Codigo SKU;Produto;Qtd Vendida;Valor Total;Lucro;Margem(%);Data e Hora\n";
-        rows.forEach(r => {
-            const dataLocal = new Date(r.data_venda + 'Z').toLocaleString('pt-BR');
-            csv += `${r.id};${r.codigo};"${r.nome}";${r.quantidade};${r.valorTotal.toFixed(2)};${r.lucro.toFixed(2)};${r.margem.toFixed(2)};${dataLocal}\n`;
-        });
-        res.header('Content-Type', 'text/csv; charset=utf-8');
-        res.attachment('relatorio_vendas.csv');
-        res.send('\uFEFF' + csv);
-    });
+app.get('/api/relatorios', verificarToken, permitirCargos(['gerente']), async (req, res) => {
+    try {
+        // Em um sistema real, aqui você faria joins complexos. Para o MVP, buscamos os totais
+        const vendas = await pool.query("SELECT SUM(total) as faturamento, SUM(lucro) as lucroTotal, COUNT(id) as totalVendas FROM vendas");
+        const totais = {
+            faturamento: parseFloat(vendas.rows[0].faturamento) || 0,
+            lucroTotal: parseFloat(vendas.rows[0].lucrototal) || 0,
+            totalVendas: parseInt(vendas.rows[0].totalvendas) || 0,
+            margemMedia: 0
+        };
+        
+        if (totais.faturamento > 0) totais.margemMedia = (totais.lucroTotal / totais.faturamento) * 100;
+
+        res.json({ totais, topProdutos: [] }); // Simplificado para garantir compatibilidade
+    } catch (err) { res.status(500).json({ erro: "Erro ao gerar relatórios" }); }
 });
 
+app.get('/api/exportar-vendas', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT id, total, lucro, data FROM vendas ORDER BY data DESC");
+        const cabecalho = "ID;Total;Lucro;Data\n";
+        const linhas = result.rows.map(v => `${v.id};${v.total};${v.lucro};${new Date(v.data).toLocaleString()}`).join('\n');
+        
+        res.header('Content-Type', 'text/csv');
+        res.attachment('historico_vendas.csv');
+        return res.send(cabecalho + linhas);
+    } catch (err) { res.status(500).send("Erro ao exportar"); }
+});
+
+// A NUVEM DEFINE A PORTA (Obrigatório para o Render)
 const PORT = process.env.PORT || 3005;
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Servidor voando na porta ${PORT}`));

@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+/* NOVA BIBLIOTECA DE ÍCONES MINIMALISTAS DO GOOGLE */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0');
+
+:root {
+    /* ... (suas cores continuam iguais aqui) ... */
+    --bg-body: #000000;
+    --bg-card: #080808;
+    --border-color: #1a1a1a;
+    --text-main: #e0e0e0;
+    --text-muted: #666666;
+    --azul-neon: #00f2fe;
+    --vermelho-alert: #ff4757;
+    --verde-ok: #2ed573;
+
+    --font-micro: 11px;
+    --font-small: 13px;
+    --font-base: 15px;
+    --font-title: 18px;
+    --font-header: 22px;
+    --font-giant: 36px;
+}
+
+/* CLASSE MESTRE DOS ÍCONES */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+/* --- RESET E BASE --- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+    background-color: var(--bg-body); 
+    color: var(--text-main); 
+    font-family: 'Roboto', sans-serif; 
+    font-weight: 400; 
+    font-size: var(--font-base); 
+}
+/* --- CORREÇÃO DOS LINKS E CARDS --- */
+a, a:hover, a:visited, a:active { 
+    text-decoration: none !important; 
+    color: inherit !important;       
+}
+
+/* --- ALINHAMENTO MESTRE (MANTÉM TUDO NO CENTRO DA TELA) --- */
+.container { 
+    max-width: 1200px; /* Limita a largura para não esticar demais em monitores grandes */
+    margin: 0 auto;    /* Centraliza na tela */
+    padding: 20px; 
+}
+
+/* --- NAVEGAÇÃO / HEADER --- */
+.nav { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    border-bottom: 1px solid var(--border-color); 
+    padding-bottom: 20px; 
+    margin-bottom: 30px; 
+}
+h1 { font-size: var(--font-header); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #fff; }
+h2, h3 { font-size: var(--font-title); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; color: #fff; }
+.desc { color: var(--text-muted); font-size: var(--font-small); line-height: 1.5; margin-top: 10px; }
+
+/* --- CARDS E MÓDULOS (PAINEL) --- */
+.card { 
+    background: var(--bg-card); 
+    border: 1px solid var(--border-color); 
+    padding: 25px; 
+    border-radius: 6px; 
+    margin-bottom: 20px; 
+}
+.grid-modulos { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); 
+    gap: 25px; 
+}
+.card-modulo { 
+    background: var(--bg-card); 
+    border: 1px solid var(--border-color); 
+    padding: 40px 20px; 
+    text-align: center; 
+    border-radius: 6px; 
+    transition: all 0.3s ease; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    height: 100%; 
+}
+.card-modulo:hover { 
+    border-color: var(--azul-neon); 
+    transform: translateY(-5px); 
+    box-shadow: 0 5px 20px rgba(0, 242, 254, 0.1); 
+}
+/* ÍCONES DO PAINEL E BOTÕES */
+.icone-g { 
+    font-size: 48px; 
+    color: var(--azul-neon); 
+    margin-bottom: 15px; 
+    transition: 0.3s;
+}
+.card-modulo:hover .icone-g {
+    transform: scale(1.1); /* Dá um zoom elegante no ícone ao passar o mouse */
+    color: #fff;
+}
+.icone-btn { 
+    font-size: 16px; 
+    margin-right: 5px; 
+}
+
+/* --- BOTÕES UNIFICADOS --- */
+button, .btn-nav { 
+    font-family: 'Roboto', sans-serif; background: transparent; border: 1px solid #333; 
+    color: var(--text-main); padding: 12px 24px; cursor: pointer; text-transform: uppercase; 
+    font-size: var(--font-small); font-weight: 700; letter-spacing: 1px; transition: 0.3s; 
+    border-radius: 4px; display: inline-block; text-align: center; 
+}
+button:hover, .btn-nav:hover { background: #111; border-color: #555; }
+
+.btn-sair, .btn-danger { border-color: var(--vermelho-alert) !important; color: var(--vermelho-alert) !important; }
+.btn-sair:hover, .btn-danger:hover { background: var(--vermelho-alert) !important; color: #fff !important; box-shadow: 0 0 15px rgba(255, 71, 87, 0.4) !important; }
+
+.btn-processar { border-color: var(--azul-neon) !important; color: var(--azul-neon) !important; }
+.btn-processar:hover { background: var(--azul-neon) !important; color: #000 !important; box-shadow: 0 0 20px rgba(0, 242, 254, 0.5) !important; }
+
+/* --- INPUTS E FORMULÁRIOS --- */
+input { 
+    font-family: 'Roboto', sans-serif; background: #050505; border: 1px solid var(--border-color); 
+    color: #fff; padding: 12px 15px; width: 100%; margin-bottom: 15px; border-radius: 4px; 
+    font-size: var(--font-base); outline: none; transition: 0.3s; 
+}
+input:focus { border-color: var(--azul-neon); box-shadow: 0 0 10px rgba(0, 242, 254, 0.1); }
+.input-tabela { margin: 0; padding: 8px; font-size: var(--font-base); text-align: center; width: 100%; }
+
+/* --- TABELAS ALINHADAS --- */
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th { text-align: left; color: var(--text-muted); font-size: var(--font-small); text-transform: uppercase; padding: 15px; border-bottom: 2px solid var(--border-color); letter-spacing: 1px; }
+td { padding: 15px; border-bottom: 1px solid #111; vertical-align: middle; font-size: var(--font-base); }
+tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+/* --- UTILITÁRIOS E CONTRASTES --- */
+.estoque-critico { color: var(--vermelho-alert); font-weight: bold; }
+.valor-gigante { font-size: var(--font-giant); color: var(--azul-neon); font-weight: bold; margin: 20px 0; text-shadow: 0 0 15px rgba(0, 242, 254, 0.3); }

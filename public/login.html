@@ -1,20 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - PDV</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-box { background: #1e1e1e; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 100%; max-width: 350px; border-top: 3px solid #00f2fe; text-align: center; }
-        h2 { margin: 0 0 20px 0; color: #fff; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; }
-        input { width: 100%; padding: 15px; margin-bottom: 15px; background-color: #121212; border: 1px solid #333; color: #fff; border-radius: 4px; box-sizing: border-box; font-size: 1em; }
-        input:focus { border-color: #00f2fe; outline: none; }
-        button { width: 100%; padding: 15px; background-color: #00f2fe; color: #121212; border: none; border-radius: 4px; font-weight: bold; font-size: 1em; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
-        button:hover { background-color: #00d4df; box-shadow: 0 0 10px rgba(0, 242, 254, 0.4); }
-        .erro { color: #fe00a1; font-size: 0.9em; margin-top: 15px; display: none; }
-    </style>
+    <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
 
     <div class="login-box">
@@ -29,33 +22,43 @@
 
     <script>
         document.getElementById('formLogin').addEventListener('submit', async (e) => {
-            e.preventDefault();
+            e.preventDefault(); // Impede a página de recarregar "piscando"
+
+            // 1. Pega os valores que você digitou
             const usuario = document.getElementById('usuario').value;
             const senha = document.getElementById('senha').value;
             const msgErro = document.getElementById('mensagemErro');
 
             try {
-                const resposta = await fetch('/api/login', {
+                // 2. Manda pro servidor
+                const res = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usuario, senha })
                 });
 
-                const dados = await resposta.json();
+                const dados = await res.json();
 
-                if (resposta.ok) {
-                    // Salva o "crachá" no navegador e redireciona para o Caixa
+                if (res.ok) {
+                    // 3. Salva os "Crachás" de segurança
                     localStorage.setItem('pdv_token', dados.token);
-                    window.location.href = '/'; 
-                } else {
-                    msgErro.innerText = dados.erro;
+                    localStorage.setItem('pdv_cargo', dados.cargo);
+
+                    // 4. Catraca Inteligente (Redirecionamento)
+                    window.location.href = 'painel.html';
+
+                    // Exibe a mensagem de erro bonita no HTML
+                    msgErro.innerText = dados.erro || "Usuário ou senha inválidos!";
                     msgErro.style.display = 'block';
                 }
             } catch (erro) {
-                msgErro.innerText = "Erro de conexão com o servidor.";
+                console.error("Erro no login:", erro);
+                msgErro.innerText = "Erro ao conectar com o servidor.";
                 msgErro.style.display = 'block';
             }
         });
+
     </script>
 </body>
+
 </html>
