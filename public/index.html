@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +13,7 @@
             gap: 20px;
             align-items: start;
         }
-        
+
         /* Destaque especial para o painel de cobrança */
         .painel-total-card {
             border-color: var(--azul-neon);
@@ -20,20 +21,25 @@
             text-align: center;
             padding: 40px 25px;
         }
-        
+
         /* Ajuste fino para o input do leitor de código de barras */
         .input-barras {
             font-size: 16px;
             letter-spacing: 2px;
             font-weight: bold;
         }
-        .input-barras::placeholder { font-weight: normal; letter-spacing: normal; }
+
+        .input-barras::placeholder {
+            font-weight: normal;
+            letter-spacing: normal;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="container">
-        
+
         <div class="nav">
             <div class="nav-links">
                 <a href="painel.html" class="btn-nav">
@@ -47,18 +53,21 @@
         </div>
 
         <div class="grid-caixa">
-            
+
             <div>
                 <div class="card flex-row-center" style="padding: 20px;">
-                    <input type="text" id="buscaProduto" class="input-barras" placeholder="Bipar Código (SKU)..." autofocus style="flex: 3; margin: 0;">
-                    <input type="number" id="qtdProduto" value="1" min="1" style="flex: 1; margin: 0; text-align: center; font-weight: bold;">
+                    <input type="text" id="buscaProduto" class="input-barras" placeholder="Bipar Código (SKU)..."
+                        autofocus style="flex: 3; margin: 0;">
+                    <input type="number" id="qtdProduto" value="1" min="1"
+                        style="flex: 1; margin: 0; text-align: center; font-weight: bold;">
                     <button onclick="adicionarAoCarrinho()" class="btn-processar" style="flex: 1.5; margin: 0;">
                         <span class="material-symbols-outlined icone-btn">add_shopping_cart</span> Adicionar
                     </button>
                 </div>
 
                 <div class="card" style="margin-top: 20px; min-height: 400px; overflow-x: auto;">
-                    <h3 style="color: var(--text-muted); font-size: 12px; margin-top: 0;">CUPOM FISCAL / ITENS DA COMPRA</h3>
+                    <h3 style="color: var(--text-muted); font-size: 12px; margin-top: 0;">CUPOM FISCAL / ITENS DA COMPRA
+                    </h3>
                     <table>
                         <thead>
                             <tr>
@@ -70,7 +79,7 @@
                             </tr>
                         </thead>
                         <tbody id="listaCarrinho">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -78,16 +87,18 @@
             <div class="card painel-total-card">
                 <h3 style="color: var(--text-muted); margin: 0; font-size: 14px;">TOTAL DA COMPRA</h3>
                 <div class="valor-gigante" id="valorTotal" style="margin: 30px 0;">R$ 0.00</div>
-                
-                <button onclick="finalizarVenda()" class="btn-processar" id="btnFinalizar" 
-                        style="width: 100%; height: 60px; font-size: 15px; border-width: 2px;" disabled>
-                    <span class="material-symbols-outlined icone-btn" style="font-size: 20px;">payments</span> FINALIZAR VENDA
+
+                <button onclick="finalizarVenda()" class="btn-processar" id="btnFinalizar"
+                    style="width: 100%; height: 60px; font-size: 15px; border-width: 2px;" disabled>
+                    <span class="material-symbols-outlined icone-btn" style="font-size: 20px;">payments</span> FINALIZAR
+                    VENDA
                 </button>
             </div>
 
         </div>
 
-    </div> <script>
+    </div>
+    <script>
         const token = localStorage.getItem('pdv_token');
         const cargo = localStorage.getItem('pdv_cargo');
 
@@ -100,7 +111,11 @@
         function fazerLogout() { localStorage.clear(); window.location.href = 'login.html'; }
 
         let produtosCatalogo = [];
-        let carrinho = [];
+        // 1. Carrega a memória
+        let carrinho = JSON.parse(localStorage.getItem('carrinho_pdv')) || [];
+        // 2. Atualiza a interface com os dados da memória
+        atualizarInterface();
+
 
         async function carregarCatalogo() {
             try {
@@ -108,6 +123,20 @@
                 if (res.status === 401) return fazerLogout();
                 produtosCatalogo = await res.json();
             } catch (erro) { console.error("Erro ao conectar com o banco:", erro); }
+        }
+        // A função mágica que transforma qualquer número em Real formatado
+        function formatarDinheiro(valor) {
+            const numero = parseFloat(valor) || 0;
+            return numero.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            });
+        }
+
+        // Se quiser formatar só o número (sem o R$), como quantidades de estoque:
+        function formatarNumero(valor) {
+            const numero = parseInt(valor) || 0;
+            return numero.toLocaleString('pt-BR');
         }
 
         function adicionarAoCarrinho() {
@@ -150,6 +179,9 @@
             document.getElementById('qtdProduto').value = '1';
             document.getElementById('buscaProduto').focus();
             atualizarInterface();
+
+            // Pega a variável carrinho, transforma em texto e salva no navegador
+            localStorage.setItem('carrinho_pdv', JSON.stringify(carrinho));
         }
 
         document.getElementById('buscaProduto').addEventListener('keypress', function (e) {
@@ -160,6 +192,7 @@
             carrinho.splice(index, 1);
             atualizarInterface();
             document.getElementById('buscaProduto').focus();
+            localStorage.setItem('carrinho_pdv', JSON.stringify(carrinho));
         }
 
         function atualizarInterface() {
@@ -182,8 +215,8 @@
                 </tr>`;
             }).join('');
 
-            document.getElementById('valorTotal').innerText = `R$ ${total.toFixed(2)}`;
-            
+            document.getElementById('valorTotal').innerText = formatarDinheiro(total);
+
             const btnFinalizar = document.getElementById('btnFinalizar');
             if (carrinho.length === 0) {
                 btnFinalizar.disabled = true;
@@ -220,9 +253,12 @@
             } catch (e) { alert("❌ Falha na conexão com o servidor."); }
 
             btn.innerHTML = `<span class="material-symbols-outlined icone-btn" style="font-size: 20px;">payments</span> FINALIZAR VENDA`;
+            // Limpa a memória do navegador
+            localStorage.removeItem('carrinho_pdv');
         }
 
         carregarCatalogo();
     </script>
 </body>
+
 </html>

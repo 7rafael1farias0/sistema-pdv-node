@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -15,36 +17,46 @@ app.use(express.static('public'));
 
 const SECRET = 'chave_super_secreta_pdv';
 
-// ==========================================
-// ☁️ CONEXÃO COM O BANCO DE DADOS POSTGRESQL
-// ==========================================
-// Se estiver no Render, ele usa a URL da nuvem. Se estiver no seu PC, ele pode rodar local (se você configurar) ou dar erro.
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL || 'postgresql://postgres:senha@localhost:5432/pdv',
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false // Exigência do Render gratuito
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Inicialização das Tabelas no Postgres
-const initDB = async () => {
+// ==========================================
+// ☁️ INICIALIZAÇÃO DO BANCO
+// ==========================================
+const initDB = async () => { 
     try {
         await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario VARCHAR(255) UNIQUE, senha VARCHAR(255), cargo VARCHAR(50))`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS produtos (id SERIAL PRIMARY KEY, codigo VARCHAR(255) UNIQUE, nome VARCHAR(255), precoCusto DECIMAL(10,2), precoVenda DECIMAL(10,2), precoPromocao DECIMAL(10,2), emPromocao INTEGER DEFAULT 0, estoque INTEGER)`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS produtos (id SERIAL PRIMARY KEY, codigo VARCHAR(255) UNIQUE, nome VARCHAR(255), precoCusto DECIMAL(10,2), precoVenda DECIMAL(10,2), precoPromocao DECIMAL(10,2), emPromocao INTEGER DEFAULT 0, estoque INTEGER, vendidos INTEGER DEFAULT 0)`);
         await pool.query(`CREATE TABLE IF NOT EXISTS vendas (id SERIAL PRIMARY KEY, total DECIMAL(10,2), lucro DECIMAL(10,2), data TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
         
+        await pool.query(`CREATE TABLE IF NOT EXISTS itens_venda (
+            id SERIAL PRIMARY KEY,
+            venda_id INTEGER,
+            produto_codigo VARCHAR(255),
+            nome_produto VARCHAR(255),
+            preco_custo DECIMAL(10,2),
+            preco_venda_real DECIMAL(10,2),
+            quantidade INTEGER,
+            data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+        try { await pool.query("ALTER TABLE produtos ADD COLUMN vendidos INTEGER DEFAULT 0"); } catch (e) { }
+
         const adminCheck = await pool.query("SELECT * FROM usuarios WHERE usuario = 'admin'");
         if (adminCheck.rows.length === 0) {
             await pool.query("INSERT INTO usuarios (usuario, senha, cargo) VALUES ($1, $2, $3)", ['admin', '123456', 'gerente']);
-            console.log("👑 Usuário admin padrão recriado na nuvem.");
         }
-        console.log("✅ Banco de dados conectado e tabelas verificadas.");
+        console.log("✅ Banco de dados e tabelas detalhadas prontas!");
     } catch (err) {
-        console.error("❌ Erro ao criar tabelas no Postgres:", err);
+        console.error("❌ Erro no initDB:", err);
     }
 };
 initDB();
 
 // ==========================================
-// 🛡️ MIDDLEWARES E SEGURANÇA
+// 🛡️ MIDDLEWARES
 // ==========================================
 function verificarToken(req, res, next) {
     const token = req.headers['authorization'];
@@ -54,6 +66,12 @@ function verificarToken(req, res, next) {
         req.usuario = decoded;
         next();
     });
+}
+
+function tratarNumero(valor) {
+    if (valor === undefined || valor === null || valor === '') return 0;
+    if (typeof valor === 'number') return valor;
+    return parseFloat(valor.toString().replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
 }
 
 function permitirCargos(cargosPermitidos) {
@@ -87,57 +105,56 @@ app.get('/api/usuarios', verificarToken, permitirCargos(['gerente']), async (req
     } catch (err) { res.status(500).json({ erro: "Erro ao buscar equipe" }); }
 });
 
-app.post('/api/usuarios', verificarToken, permitirCargos(['gerente']), async (req, res) => {
-    const { usuario, senha, cargo } = req.body;
-    try {
-        await pool.query("INSERT INTO usuarios (usuario, senha, cargo) VALUES ($1, $2, $3)", [usuario, senha, cargo]);
-        res.json({ mensagem: "Usuário criado!" });
-    } catch (err) { res.status(400).json({ erro: "Usuário já existe ou erro de banco" }); }
-});
-
-app.delete('/api/usuarios/:id', verificarToken, permitirCargos(['gerente']), async (req, res) => {
-    if (parseInt(req.params.id) === req.usuario.id) return res.status(400).json({ erro: "Você não pode excluir a si mesmo!" });
-    try {
-        await pool.query("DELETE FROM usuarios WHERE id = $1", [req.params.id]);
-        res.json({ mensagem: "Excluído com sucesso" });
-    } catch (err) { res.status(500).json({ erro: "Erro ao excluir" }); }
-});
-
 // ==========================================
-// 📦 ROTAS DE PRODUTOS (ESTOQUE)
+// 📦 ROTAS DE PRODUTOS (Completas)
 // ==========================================
 app.get('/api/produtos', verificarToken, async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM produtos ORDER BY nome ASC");
-        res.json(result.rows);
+        const produtosFormatados = result.rows.map(p => ({
+            id: p.id, codigo: p.codigo, nome: p.nome,
+            precoCusto: parseFloat(p.precocusto || 0),
+            precoVenda: parseFloat(p.precovenda || 0),
+            precoPromocao: parseFloat(p.precopromocao || 0),
+            emPromocao: parseInt(p.empromocao || 0),
+            estoque: parseInt(p.estoque || 0),
+            vendidos: parseInt(p.vendidos || 0)
+        }));
+        res.json(produtosFormatados);
     } catch (err) { res.status(500).json({ erro: "Erro ao buscar produtos" }); }
 });
 
 app.post('/api/produtos', verificarToken, permitirCargos(['gerente', 'estoquista']), async (req, res) => {
-    const { codigo, nome, precoCusto, precoVenda, precoPromocao, estoque } = req.body;
-    const promoFinal = (precoPromocao && precoPromocao > 0) ? precoPromocao : precoVenda;
+    const { codigo, nome } = req.body;
+    const precoCusto = tratarNumero(req.body.precoCusto);
+    const precoVenda = tratarNumero(req.body.precoVenda);
+    const precoPromocao = tratarNumero(req.body.precoPromocao);
+    const estoque = parseInt(req.body.estoque) || 0;
+    const promoFinal = (precoPromocao > 0) ? precoPromocao : precoVenda;
     const emPromocao = promoFinal < precoVenda ? 1 : 0;
-    
+
     try {
-        await pool.query("INSERT INTO produtos (codigo, nome, precoCusto, precoVenda, precoPromocao, emPromocao, estoque) VALUES ($1,$2,$3,$4,$5,$6,$7)", 
-        [codigo, nome, precoCusto, precoVenda, promoFinal, emPromocao, estoque]);
+        await pool.query(
+            "INSERT INTO produtos (codigo, nome, precoCusto, precoVenda, precoPromocao, emPromocao, estoque) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+            [codigo, nome, precoCusto, precoVenda, promoFinal, emPromocao, estoque]
+        );
         io.emit('atualizacao_geral');
         res.json({ mensagem: "Produto Salvo!" });
-    } catch (err) { res.status(500).json({ erro: "Código já existe ou erro no servidor" }); }
+    } catch (err) { res.status(500).json({ erro: "Código já existe ou erro no banco" }); }
 });
 
 app.put('/api/produtos/:id', verificarToken, permitirCargos(['gerente', 'estoquista']), async (req, res) => {
-    const estoque = parseInt(req.body.estoque) || 0;
-    const precoCusto = parseFloat(req.body.precoCusto) || 0;
-    const precoVenda = parseFloat(req.body.precoVenda) || 0;
-    const precoPromocao = parseFloat(req.body.precoPromocao) || precoVenda;
-    const emPromocao = precoPromocao < precoVenda ? 1 : 0;
-    
+    const { estoque, precoCusto, precoVenda, precoPromocao } = req.body;
+    const promoFinal = parseFloat(precoPromocao) || parseFloat(precoVenda);
+    const emPromocao = promoFinal < parseFloat(precoVenda) ? 1 : 0;
+
     try {
-        await pool.query("UPDATE produtos SET estoque = $1, precoCusto = $2, precoVenda = $3, precoPromocao = $4, emPromocao = $5 WHERE id = $6", 
-        [estoque, precoCusto, precoVenda, precoPromocao, emPromocao, req.params.id]);
+        await pool.query(
+            "UPDATE produtos SET estoque = $1, precoCusto = $2, precoVenda = $3, precoPromocao = $4, emPromocao = $5 WHERE id = $6",
+            [parseInt(estoque) || 0, parseFloat(precoCusto) || 0, parseFloat(precoVenda) || 0, promoFinal, emPromocao, req.params.id]
+        );
         io.emit('atualizacao_geral');
-        res.json({ mensagem: "Atualizado!" });
+        res.json({ mensagem: "Atualizado com sucesso!" });
     } catch (err) { res.status(500).json({ erro: "Erro ao atualizar" }); }
 });
 
@@ -145,7 +162,6 @@ app.put('/api/produtos/:id/promocao', verificarToken, permitirCargos(['gerente']
     try {
         const result = await pool.query("SELECT emPromocao FROM produtos WHERE id = $1", [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ erro: "Produto não encontrado" });
-        
         const novoStatus = result.rows[0].empromocao === 1 ? 0 : 1;
         await pool.query("UPDATE produtos SET emPromocao = $1 WHERE id = $2", [novoStatus, req.params.id]);
         io.emit('atualizacao_geral');
@@ -161,76 +177,126 @@ app.delete('/api/produtos/:id', verificarToken, permitirCargos(['gerente', 'esto
     } catch (err) { res.status(500).json({ erro: "Erro ao excluir" }); }
 });
 
-// Importação CSV em Lote
 app.post('/api/produtos/lote', verificarToken, permitirCargos(['gerente', 'estoquista']), async (req, res) => {
     const { produtos } = req.body;
     try {
         for (const p of produtos) {
-            const promoFinal = (p.precoPromocao && p.precoPromocao > 0) ? p.precoPromocao : p.precoVenda;
-            const emPromocao = promoFinal < p.precoVenda ? 1 : 0;
-            
-            // Faz Inserção ou Atualização se o código já existir
+            const precoCusto = tratarNumero(p.precoCusto);
+            const precoVenda = tratarNumero(p.precoVenda);
+            const precoPromocao = tratarNumero(p.precoPromocao);
+            const estoque = parseInt(p.estoque) || 0;
+            const promoFinal = (precoPromocao > 0) ? precoPromocao : precoVenda;
+            const emPromocao = promoFinal < precoVenda ? 1 : 0;
+
             await pool.query(
                 `INSERT INTO produtos (codigo, nome, precoCusto, precoVenda, precoPromocao, emPromocao, estoque) 
                  VALUES ($1,$2,$3,$4,$5,$6,$7) 
                  ON CONFLICT (codigo) DO UPDATE SET 
                  precoCusto=EXCLUDED.precoCusto, precoVenda=EXCLUDED.precoVenda, precoPromocao=EXCLUDED.precoPromocao, emPromocao=EXCLUDED.emPromocao, estoque=EXCLUDED.estoque`,
-                [p.codigo, p.nome, p.precoCusto, p.precoVenda, promoFinal, emPromocao, p.estoque]
+                [p.codigo, p.nome, precoCusto, precoVenda, promoFinal, emPromocao, estoque]
             );
         }
         io.emit('atualizacao_geral');
         res.json({ mensagem: "Importação concluída" });
-    } catch (err) { res.status(500).json({ erro: "Erro ao processar lote CSV" }); }
+    } catch (err) { res.status(500).json({ erro: "Erro ao processar lote" }); }
 });
 
 // ==========================================
-// 💸 ROTAS DO CAIXA E DASHBOARD
+// 💸 ROTAS DO CAIXA E VENDAS
 // ==========================================
 app.post('/api/vendas', verificarToken, permitirCargos(['gerente', 'vendedor']), async (req, res) => {
     const { total, lucro, itens } = req.body;
     try {
-        // Registra a venda financeira
-        await pool.query("INSERT INTO vendas (total, lucro) VALUES ($1, $2)", [total, lucro]);
-        
-        // Baixa o estoque de cada item
+        const vendaPrincipal = await pool.query(
+            "INSERT INTO vendas (total, lucro) VALUES ($1, $2) RETURNING id", 
+            [total, lucro]
+        );
+        const vendaId = vendaPrincipal.rows[0].id;
+
         for (const item of itens) {
-            await pool.query("UPDATE produtos SET estoque = estoque - $1 WHERE codigo = $2", [item.qtd, item.codigo]);
+            await pool.query(
+                `INSERT INTO itens_venda (venda_id, produto_codigo, nome_produto, preco_custo, preco_venda_real, quantidade) 
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [vendaId, item.codigo, item.nome, (item.precoUnitario - (item.lucroTotal/item.qtd)), item.precoUnitario, item.qtd]
+            );
+            await pool.query(
+                "UPDATE produtos SET estoque = estoque - $1, vendidos = COALESCE(vendidos, 0) + $1 WHERE codigo = $2", 
+                [item.qtd, item.codigo]
+            );
         }
-        
         io.emit('atualizacao_geral');
-        res.json({ mensagem: "Venda concluída!" });
+        res.json({ mensagem: "Venda concluída com detalhes!" });
     } catch (err) { res.status(500).json({ erro: "Erro ao fechar venda" }); }
 });
 
+// ==========================================
+// 📊 DASHBOARD E EXPORTAÇÃO
+// ==========================================
 app.get('/api/relatorios', verificarToken, permitirCargos(['gerente']), async (req, res) => {
+    const { inicio, fim } = req.query;
+    let filtroData = "";
+    let params = [];
+
+    if (inicio && fim) {
+        filtroData = "WHERE data BETWEEN $1 AND $2";
+        params = [inicio + " 00:00:00", fim + " 23:59:59"];
+    }
+
     try {
-        // Em um sistema real, aqui você faria joins complexos. Para o MVP, buscamos os totais
-        const vendas = await pool.query("SELECT SUM(total) as faturamento, SUM(lucro) as lucroTotal, COUNT(id) as totalVendas FROM vendas");
+        const vendasTotais = await pool.query(
+            `SELECT SUM(total) as faturamento, SUM(lucro) as lucroTotal, COUNT(id) as totalVendas 
+             FROM vendas ${filtroData}`, params
+        );
+
         const totais = {
-            faturamento: parseFloat(vendas.rows[0].faturamento) || 0,
-            lucroTotal: parseFloat(vendas.rows[0].lucrototal) || 0,
-            totalVendas: parseInt(vendas.rows[0].totalvendas) || 0,
+            faturamento: parseFloat(vendasTotais.rows[0].faturamento) || 0,
+            lucroTotal: parseFloat(vendasTotais.rows[0].lucrototal) || 0,
+            totalVendas: parseInt(vendasTotais.rows[0].totalvendas) || 0,
             margemMedia: 0
         };
-        
         if (totais.faturamento > 0) totais.margemMedia = (totais.lucroTotal / totais.faturamento) * 100;
 
-        res.json({ totais, topProdutos: [] }); // Simplificado para garantir compatibilidade
-    } catch (err) { res.status(500).json({ erro: "Erro ao gerar relatórios" }); }
+        const topProd = await pool.query(
+            "SELECT nome, vendidos FROM produtos WHERE vendidos > 0 ORDER BY vendidos DESC LIMIT 10"
+        );
+
+        res.json({ totais, topProdutos: topProd.rows }); 
+    } catch (err) { res.status(500).json({ erro: "Erro nos relatórios" }); }
 });
 
 app.get('/api/exportar-vendas', async (req, res) => {
     try {
-        const result = await pool.query("SELECT id, total, lucro, data FROM vendas ORDER BY data DESC");
-        const cabecalho = "ID;Total;Lucro;Data\n";
-        const linhas = result.rows.map(v => `${v.id};${v.total};${v.lucro};${new Date(v.data).toLocaleString()}`).join('\n');
+        const result = await pool.query(`
+            SELECT produto_codigo, nome_produto, preco_custo, preco_venda_real, quantidade, 
+            (preco_venda_real * quantidade) as subtotal,
+            TO_CHAR(data_hora, 'DD/MM/YYYY HH24:MI') as momento
+            FROM itens_venda 
+            ORDER BY data_hora DESC
+        `);
+
+        const cabecalho = "SKU;PRODUTO;CUSTO_UN;VENDA_UN;QTD;SUBTOTAL;DATA_HORA\n";
+        const linhas = result.rows.map(v => 
+            `${v.produto_codigo};${v.nome_produto.toUpperCase()};${v.preco_custo};${v.preco_venda_real};${v.quantidade};${v.subtotal};${v.momento}`
+        ).join('\n');
         
-        res.header('Content-Type', 'text/csv');
-        res.attachment('historico_vendas.csv');
-        return res.send(cabecalho + linhas);
+        res.header('Content-Type', 'text/csv; charset=utf-8');
+        res.attachment('relatorio_detalhado_vendas.csv');
+        return res.send('\ufeff' + cabecalho + linhas);
     } catch (err) { res.status(500).send("Erro ao exportar"); }
 });
 
-// A NUVEM DEFINE A PORTA (Obrigatório para o Render)
+// ==========================================
+// 🧹 ROTA DE LIMPEZA GERAL
+// ==========================================
+app.delete('/api/limpar-vendas', verificarToken, permitirCargos(['gerente']), async (req, res) => {
+    try {
+        await pool.query("DELETE FROM itens_venda");
+        await pool.query("DELETE FROM vendas");
+        await pool.query("UPDATE produtos SET vendidos = 0");
+        io.emit('atualizacao_geral');
+        res.json({ mensagem: "Histórico zerado!" });
+    } catch (err) { res.status(500).json({ erro: "Erro ao limpar banco" }); }
+});
+
 const PORT = process.env.PORT || 3005;
 server.listen(PORT, () => console.log(`🚀 Servidor voando na porta ${PORT}`));

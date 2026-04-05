@@ -1,15 +1,26 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <title>Gestão de Estoque</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .input-promocao { color: #ff4757 !important; font-weight: bold; }
-        .input-custo { color: #aaa !important; }
-        tbody tr { transition: background-color 0.4s ease; }
+        .input-promocao {
+            color: #00FF66 !important;
+            font-weight: bold;
+        }
+
+        .input-custo {
+            color: #aaa !important;
+        }
+
+        tbody tr {
+            transition: background-color 0.4s ease;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="container">
@@ -33,7 +44,8 @@
                 <div style="display: flex; gap: 10px;">
                     <input type="number" id="precoCusto" placeholder="Custo R$" step="0.01">
                     <input type="number" id="precoVenda" placeholder="Venda R$" step="0.01">
-                    <input type="number" id="precoPromocao" placeholder="Promoção R$" step="0.01" class="input-promocao">
+                    <input type="number" id="precoPromocao" placeholder="Promoção R$" step="0.01"
+                        class="input-promocao">
                 </div>
                 <input type="number" id="estoque" placeholder="Qtd Inicial (Estoque)">
                 <button onclick="salvarProduto()" class="btn-processar" style="width: 100%;">
@@ -44,14 +56,19 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3>
-                        <span class="material-symbols-outlined icone-btn" style="color:#aaa;">upload_file</span> Importar Lote CSV
+                        <span class="material-symbols-outlined icone-btn" style="color:#aaa;">upload_file</span>
+                        Importar Lote CSV
                     </h3>
-                    <button onclick="baixarModeloCSV()" class="btn-nav" style="font-size: 10px; border-color: #2ed573; color: #2ed573; padding: 8px 12px;">
-                        <span class="material-symbols-outlined icone-btn" style="font-size:14px;">file_download</span> Baixar Modelo
+                    <button onclick="baixarModeloCSV()" class="btn-nav"
+                        style="font-size: 10px; border-color: #2ed573; color: #2ed573; padding: 8px 12px;">
+                        <span class="material-symbols-outlined icone-btn" style="font-size:14px;">file_download</span>
+                        Baixar Modelo
                     </button>
                 </div>
-                <p style="font-size: 11px; color: #aaa; margin: 15px 0; line-height: 1.5;">Padrão: Código ; Nome ; Custo ; Venda ; Promoção ; Estoque</p>
-                <input type="file" id="arquivoCsv" accept=".csv" style="border: 1px dashed #333; padding: 15px; background: transparent; color: #fff; width: 100%; margin-bottom: 15px; font-size:12px;">
+                <p style="font-size: 11px; color: #aaa; margin: 15px 0; line-height: 1.5;">Padrão: Código ; Nome ; Custo
+                    ; Venda ; Promoção ; Estoque</p>
+                <input type="file" id="arquivoCsv" accept=".csv"
+                    style="border: 1px dashed #333; padding: 15px; background: transparent; color: #fff; width: 100%; margin-bottom: 15px; font-size:12px;">
                 <button onclick="importarCSV()" class="btn-processar" style="width: 100%;">Processar Arquivo</button>
             </div>
         </div>
@@ -80,19 +97,30 @@
         const authHeader = { 'Authorization': `Bearer ${token}` };
 
         if (!token || cargo === 'vendedor') window.location.href = 'index.html';
+        // A função mágica que transforma qualquer número em Real formatado
+        function formatarDinheiro(valor) {
+            const numero = parseFloat(valor) || 0;
+            return numero.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            });
+        }
 
-        // 1. CARREGAR LISTA (AGORA DESENHANDO ÍCONES VETORIAIS)
+        // Se quiser formatar só o número (sem o R$), como quantidades de estoque:
+        function formatarNumero(valor) {
+            const numero = parseInt(valor) || 0;
+            return numero.toLocaleString('pt-BR');
+        }
+
+        // 1. CARREGAR E DESENHAR A TABELA
         async function carregarProdutos() {
             try {
                 const res = await fetch('/api/produtos', { headers: authHeader });
                 const produtos = await res.json();
-                
+
                 document.getElementById('corpoTabela').innerHTML = produtos.map(p => {
                     const statusEstoque = p.estoque < 5 ? 'estoque-critico' : '';
-                    
-                    // Lógica do Botão de Promoção Vetorial
                     const btnPromoClass = p.emPromocao === 1 ? 'btn-processar' : 'btn-nav';
-                    // Se estiver ativa, preenchemos o ícone da estrela (FILL 1)
                     const promoIconStyle = p.emPromocao === 1 ? 'font-variation-settings: \'FILL\' 1;' : '';
                     const promoVisor = p.precoPromocao > 0 ? p.precoPromocao : p.precoVenda;
 
@@ -121,16 +149,60 @@
             } catch (e) { console.error("Erro ao carregar:", e); }
         }
 
-        // ... (Mantenha o resto das funções JS iguazinhas: alternarPromocao, atualizarProduto, salvarProduto, excluirProduto, importarCSV, baixarModeloCSV, fazerLogout) ...
-        async function alternarPromocao(id) { try { const res = await fetch(`/api/produtos/${id}/promocao`, { method: 'PUT', headers: authHeader }); if (res.ok) carregarProdutos(); else alert("❌ Apenas gerentes podem alterar status de promoção."); } catch (e) { console.error(e); } }
-        async function atualizarProduto(id) { const dados = { estoque: parseInt(document.getElementById(`est-${id}`).value) || 0, precoCusto: parseFloat(document.getElementById(`pc-${id}`).value) || 0, precoVenda: parseFloat(document.getElementById(`pv-${id}`).value) || 0, precoPromocao: parseFloat(document.getElementById(`pp-${id}`).value) || 0 }; const res = await fetch(`/api/produtos/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(dados) }); if (res.ok) { const linha = document.getElementById(`linha-${id}`); linha.style.backgroundColor = "rgba(46, 213, 115, 0.1)"; setTimeout(() => { linha.style.backgroundColor = "transparent"; }, 800); } else { alert("❌ Erro ao salvar."); } }
-        async function salvarProduto() { const dados = { codigo: document.getElementById('codigo').value, nome: document.getElementById('nome').value, precoCusto: parseFloat(document.getElementById('precoCusto').value) || 0, precoVenda: parseFloat(document.getElementById('precoVenda').value) || 0, precoPromocao: parseFloat(document.getElementById('precoPromocao').value) || 0, estoque: parseInt(document.getElementById('estoque').value) || 0 }; if(!dados.codigo || !dados.nome) return alert("⚠️ Preencha Código e Nome!"); const res = await fetch('/api/produtos', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(dados) }); if (res.ok) { alert("✅ Produto Cadastrado!"); location.reload(); } }
-        async function excluirProduto(id) { if(!confirm("⚠️ Tem certeza que deseja apagar este produto?")) return; const res = await fetch(`/api/produtos/${id}`, { method: 'DELETE', headers: authHeader }); if (res.ok) carregarProdutos(); }
-        async function importarCSV() { const input = document.getElementById('arquivoCsv'); if (!input.files[0]) return alert("⚠️ Selecione o arquivo CSV!"); const leitor = new FileReader(); leitor.onload = async (e) => { const linhas = e.target.result.split('\n').slice(1); const produtos = linhas.map(l => { const c = l.split(l.includes(';') ? ';' : ','); if (c.length < 6) return null; return { codigo: c[0].trim(), nome: c[1].trim(), precoCusto: parseFloat(c[2].trim().replace(',','.')) || 0, precoVenda: parseFloat(c[3].trim().replace(',','.')) || 0, precoPromocao: parseFloat(c[4].trim().replace(',','.')) || 0, estoque: parseInt(c[5].trim()) || 0 }; }).filter(p => p); if(produtos.length === 0) return alert("❌ Arquivo fora do formato."); const res = await fetch('/api/produtos/lote', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify({ produtos }) }); if(res.ok){ alert("✅ Lote Processado!"); carregarProdutos(); input.value = ""; } }; leitor.readAsText(input.files[0], 'UTF-8'); }
-        function baixarModeloCSV() { const conteudoCSV = "Código;Nome;Custo;Venda;Promoção;Estoque\nEX001;Produto Exemplo;10.50;25.00;22.90;100\nEX002;Outro Exemplo;5.00;15.00;15.00;50"; const blob = new Blob([conteudoCSV], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); const url = URL.createObjectURL(blob); link.setAttribute("href", url); link.setAttribute("download", "modelo_importacao_pdv.csv"); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
+        // 2. ATUALIZAR PRODUTO (SALVAMENTO AUTOMÁTICO)
+        async function atualizarProduto(id) {
+            const dados = {
+                estoque: parseInt(document.getElementById(`est-${id}`).value) || 0,
+                precoCusto: parseFloat(document.getElementById(`pc-${id}`).value) || 0,
+                precoVenda: parseFloat(document.getElementById(`pv-${id}`).value) || 0,
+                precoPromocao: parseFloat(document.getElementById(`pp-${id}`).value) || 0
+            };
+
+            const res = await fetch(`/api/produtos/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...authHeader
+                },
+                body: JSON.stringify(dados)
+            });
+
+            if (res.ok) {
+                const linha = document.getElementById(`linha-${id}`);
+                linha.style.backgroundColor = "rgba(46, 213, 115, 0.1)";
+                setTimeout(() => { linha.style.backgroundColor = "transparent"; }, 800);
+            } else {
+                alert("❌ Erro ao salvar. Verifique sua conexão ou cargo.");
+            }
+        }
+
+        // 3. OUTRAS FUNÇÕES
+        async function alternarPromocao(id) { try { const res = await fetch(`/api/produtos/${id}/promocao`, { method: 'PUT', headers: authHeader }); if (res.ok) carregarProdutos(); } catch (e) { console.error(e); } }
+
+        async function salvarProduto() {
+            const dados = {
+                codigo: document.getElementById('codigo').value,
+                nome: document.getElementById('nome').value,
+                precoCusto: parseFloat(document.getElementById('precoCusto').value) || 0,
+                precoVenda: parseFloat(document.getElementById('precoVenda').value) || 0,
+                precoPromocao: parseFloat(document.getElementById('precoPromocao').value) || 0,
+                estoque: parseInt(document.getElementById('estoque').value) || 0
+            };
+            if (!dados.codigo || !dados.nome) return alert("⚠️ Preencha Código e Nome!");
+            const res = await fetch('/api/produtos', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(dados) });
+            if (res.ok) { alert("✅ Produto Cadastrado!"); carregarProdutos(); }
+        }
+
+        async function excluirProduto(id) { if (!confirm("⚠️ Tem certeza que deseja apagar este produto?")) return; const res = await fetch(`/api/produtos/${id}`, { method: 'DELETE', headers: authHeader }); if (res.ok) carregarProdutos(); }
+
+        async function importarCSV() { const input = document.getElementById('arquivoCsv'); if (!input.files[0]) return alert("⚠️ Selecione o arquivo CSV!"); const leitor = new FileReader(); leitor.onload = async (e) => { const linhas = e.target.result.split('\n').slice(1); const produtos = linhas.map(l => { const c = l.split(l.includes(';') ? ';' : ','); if (c.length < 6) return null; return { codigo: c[0].trim(), nome: c[1].trim(), precoCusto: parseFloat(c[2].trim().replace(',', '.')) || 0, precoVenda: parseFloat(c[3].trim().replace(',', '.')) || 0, precoPromocao: parseFloat(c[4].trim().replace(',', '.')) || 0, estoque: parseInt(c[5].trim()) || 0 }; }).filter(p => p); const res = await fetch('/api/produtos/lote', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify({ produtos }) }); if (res.ok) { alert("✅ Lote Processado!"); carregarProdutos(); input.value = ""; } }; leitor.readAsText(input.files[0], 'UTF-8'); }
+
+        function baixarModeloCSV() { const conteudoCSV = "Código;Nome;Custo;Venda;Promoção;Estoque\nEX001;Produto Exemplo;10.50;25.00;22.90;100"; const blob = new Blob([conteudoCSV], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "modelo_importacao_pdv.csv"; link.click(); }
+
         function fazerLogout() { localStorage.clear(); window.location.href = 'login.html'; }
-        
+
         carregarProdutos();
     </script>
 </body>
+
 </html>

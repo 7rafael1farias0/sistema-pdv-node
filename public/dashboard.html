@@ -1,23 +1,72 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard & Relatórios</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet" />
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .kpi-card { background: var(--bg-card); border: 1px solid var(--border-color); padding: 25px 20px; border-radius: 4px; text-align: center; }
-        .kpi-titulo { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
-        .kpi-valor { font-size: 2em; font-weight: bold; }
-        .valor-azul { color: var(--azul-neon); text-shadow: 0 0 10px rgba(0, 242, 254, 0.2); }
-        .valor-verde { color: var(--verde-ok); text-shadow: 0 0 10px rgba(46, 213, 115, 0.2); }
-        .valor-branco { color: #ffffff; }
-        .valor-cinza { color: #aaaaaa; }
-        .grafico-container { background: #050505; border: 1px solid var(--border-color); padding: 20px; border-radius: 4px; height: 350px; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 25px 20px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .kpi-titulo {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .kpi-valor {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .valor-azul {
+            color: var(--azul-neon);
+            text-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+        }
+
+        .valor-verde {
+            color: var(--verde-ok);
+            text-shadow: 0 0 10px rgba(46, 213, 115, 0.2);
+        }
+
+        .valor-branco {
+            color: #ffffff;
+        }
+
+        .valor-cinza {
+            color: #aaaaaa;
+        }
+
+        .grafico-container {
+            background: #050505;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 4px;
+            height: 350px;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="container">
@@ -30,6 +79,22 @@
             <h1>DASHBOARD FINANCEIRO</h1>
             <button class="btn-sair" onclick="fazerLogout()">
                 <span class="material-symbols-outlined icone-btn">logout</span> Sair
+            </button>
+        </div>
+
+        <div class="filtros-container" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-end;">
+            <div>
+                <label style="color: #666; font-size: 12px; display: block;">DE:</label>
+                <input type="date" id="dataInicio"
+                    style="background: #111; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;">
+            </div>
+            <div>
+                <label style="color: #666; font-size: 12px; display: block;">ATÉ:</label>
+                <input type="date" id="dataFim"
+                    style="background: #111; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;">
+            </div>
+            <button onclick="carregarDashboard()" class="btn-processar" style="padding: 10px 20px;">
+                FILTRAR
             </button>
         </div>
 
@@ -60,12 +125,14 @@
 
             <div class="card" style="margin-bottom: 0;">
                 <h3 style="display: flex; align-items: center;">
-                    <span class="material-symbols-outlined icone-btn" style="color:#aaa;">analytics</span> Relatórios Oficiais
+                    <span class="material-symbols-outlined icone-btn" style="color:#aaa;">analytics</span> Relatórios
+                    Oficiais
                 </h3>
                 <p style="color: #666; font-size: 12px; margin-bottom: 20px; line-height: 1.5;">
                     Baixe o histórico completo de transações para abrir no Excel ou enviar para a contabilidade.
                 </p>
-                <button onclick="exportarCSV()" class="btn-processar" style="width: 100%; padding: 15px; font-size: 12px; display: flex; align-items: center; justify-content: center;">
+                <button onclick="exportarCSV()" class="btn-processar"
+                    style="width: 100%; padding: 15px; font-size: 12px; display: flex; align-items: center; justify-content: center;">
                     <span class="material-symbols-outlined icone-btn">download</span> EXPORTAR VENDAS (CSV)
                 </button>
             </div>
@@ -79,44 +146,120 @@
         if (!token) window.location.href = 'login.html';
         if (cargo !== 'gerente') { alert("⚠️ Acesso restrito a Gerentes."); window.location.href = 'painel.html'; }
 
+        let meuGrafico = null;
+
+        // Inicia a página já com as datas de hoje e carrega o painel (UMA SÓ VEZ)
+        window.onload = () => {
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('dataInicio').value = hoje;
+            document.getElementById('dataFim').value = hoje;
+            carregarDashboard();
+        };
+
         async function carregarDashboard() {
+            const inicio = document.getElementById('dataInicio').value;
+            const fim = document.getElementById('dataFim').value;
+
             try {
-                const res = await fetch('/api/relatorios', { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!res.ok) throw new Error("Erro ao buscar dados");
+                const url = `/api/relatorios?inicio=${inicio}&fim=${fim}`;
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
                 const dados = await res.json();
                 atualizarKPIs(dados.totais);
                 renderizarGrafico(dados.topProdutos);
-            } catch (erro) { console.error(erro); alert("❌ Erro ao carregar o painel financeiro."); }
+
+            } catch (erro) {
+                console.error("Erro ao atualizar dashboard:", erro);
+            }
+        }
+        // A função mágica que transforma qualquer número em Real formatado
+        function formatarDinheiro(valor) {
+            const numero = parseFloat(valor) || 0;
+            return numero.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            });
         }
 
+        // Se quiser formatar só o número (sem o R$), como quantidades de estoque:
+        function formatarNumero(valor) {
+            const numero = parseInt(valor) || 0;
+            return numero.toLocaleString('pt-BR');
+        }
+
+
         function atualizarKPIs(totais) {
-            document.getElementById('kpiFaturamento').innerText = `R$ ${totais.faturamento.toFixed(2)}`;
-            document.getElementById('kpiLucro').innerText = `R$ ${totais.lucroTotal.toFixed(2)}`;
-            document.getElementById('kpiVendas').innerText = totais.totalVendas;
+            document.getElementById('kpiFaturamento').innerText = formatarDinheiro(totais.faturamento);
+            document.getElementById('kpiLucro').innerText = formatarDinheiro(totais.lucroTotal);
+            document.getElementById('kpiVendas').innerText = formatarNumero(totais.totalVendas);
             document.getElementById('kpiMargem').innerText = `${totais.margemMedia.toFixed(1)}%`;
         }
 
-        let meuGrafico = null;
-        function renderizarGrafico(produtos) {
-            const ctx = document.getElementById('graficoTopProdutos').getContext('2d');
-            if (meuGrafico) meuGrafico.destroy();
-            const nomes = produtos.map(p => p.nome.toUpperCase());
-            const quantidades = produtos.map(p => p.qtdVendida);
 
+
+        function renderizarGrafico(listaProdutos) {
+            // 1. Pega o elemento do HTML corretamente (sem parênteses no const)
+            const canvas = document.getElementById('graficoTopProdutos');
+
+            // Se o canvas não existir na página, ele para aqui para não dar erro
+            if (!canvas) {
+                console.error("❌ Erro: O elemento 'graficoTopProdutos' não foi encontrado no HTML.");
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+
+            // 2. Destrói o gráfico anterior se ele já existir (sem aspas no meuGrafico)
+            if (meuGrafico) {
+                meuGrafico.destroy();
+            }
+
+            // O seu "dedo-duro" para conferirmos no F12
+            console.log("Dados que chegaram para o gráfico:", listaProdutos);
+
+            // 3. Mapeia os dados (Postgres devolve nomes de colunas em minúsculo)
+            const nomes = listaProdutos.map(p => (p.nome || "Sem Nome").toUpperCase());
+            const quantidades = listaProdutos.map(p => parseInt(p.vendidos) || 0);
+
+            // 4. Cria o gráfico novo
             meuGrafico = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: nomes,
-                    datasets: [{ label: 'Unidades', data: quantidades, backgroundColor: 'rgba(0, 242, 254, 0.2)', borderColor: '#00f2fe', borderWidth: 1, borderRadius: 2 }]
+                    datasets: [{
+                        label: 'Unidades Vendidas',
+                        data: quantidades,
+                        backgroundColor: 'rgba(0, 242, 254, 0.2)',
+                        borderColor: '#00f2fe',
+                        borderWidth: 1,
+                        borderRadius: 2
+                    }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1a1a1a' }, ticks: { color: '#666', stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: '#aaa', font: { size: 10 } } } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#1a1a1a' },
+                            ticks: { color: '#666', stepSize: 1 }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#aaa', font: { size: 10 } }
+                        }
+                    }
+                }
             });
         }
 
         function exportarCSV() { window.location.href = `/api/exportar-vendas?token=${token}`; }
         function fazerLogout() { localStorage.clear(); window.location.href = 'login.html'; }
-        
-        carregarDashboard();
+
     </script>
 </body>
+
 </html>
