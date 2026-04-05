@@ -43,21 +43,78 @@ a, a:hover, a:visited, a:active {
 }
 
 /* --- ALINHAMENTO MESTRE (MANTÉM TUDO NO CENTRO DA TELA) --- */
-.container { 
-    max-width: 1200px; /* Limita a largura para não esticar demais em monitores grandes */
-    margin: 0 auto;    /* Centraliza na tela */
-    padding: 20px; 
+/* ========================================== */
+/* 1. CENTRALIZAÇÃO E ESTRUTURA BASE          */
+/* ========================================== */
+.container {
+    max-width: 1200px;  /* Largura máxima do seu sistema */
+    margin: 0 auto;     /* O "auto" nas laterais é o que centraliza a tela! */
+    padding: 20px;      /* Desgruda o conteúdo das bordas no celular */
+    width: 100%;
+    box-sizing: border-box; /* Impede que o padding quebre a largura */
 }
 
-/* --- NAVEGAÇÃO / HEADER --- */
-.nav { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    border-bottom: 1px solid var(--border-color); 
-    padding-bottom: 20px; 
-    margin-bottom: 30px; 
+/* Deixa a barra de navegação alinhada e fluida */
+.nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* Permite quebrar linha se não couber */
+    gap: 15px;
+    margin-bottom: 30px;
 }
+
+/* ========================================== */
+/* 2. RESPONSIVIDADE (TELAS MENORES QUE 768PX)*/
+/* ========================================== */
+@media (max-width: 768px) {
+    /* O Caixa e o Dashboard passam a ficar um embaixo do outro */
+    .caixa-grid, 
+    .kpi-grid {
+        grid-template-columns: 1fr !important; /* Coluna única */
+    }
+
+    /* O grid que divide o Gráfico e o botão Exportar vira 1 coluna */
+    div[style*="grid-template-columns: 2fr 1fr;"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* O menu superior (Nav) empilha para não apertar os botões */
+    .nav {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    /* Diminui o textão do valor do caixa para caber na tela */
+    .valor-gigante {
+        font-size: 2.5em;
+    }
+
+    /* Os filtros de data também empilham no mobile */
+    .filtros-container {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+}
+
+/* ========================================== */
+/* 3. TABELAS RESPONSIVAS                     */
+/* ========================================== */
+.card {
+    background: var(--bg-card, #1a1a1a);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #333);
+    overflow-x: auto; /* O pulo do gato: Cria a barrinha de rolagem horizontal se não couber */
+    -webkit-overflow-scrolling: touch; /* Deixa a rolagem lisinha no iPhone */
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px; /* Impede a tabela de ficar fina demais. Força a rolagem horizontal */
+}
+
 h1 { font-size: var(--font-header); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #fff; }
 h2, h3 { font-size: var(--font-title); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; color: #fff; }
 .desc { color: var(--text-muted); font-size: var(--font-small); line-height: 1.5; margin-top: 10px; }
