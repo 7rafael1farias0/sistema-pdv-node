@@ -15,22 +15,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const SECRET = 'chave_super_secreta_pdv';
+const SECRET = process.env.JWT_SECRET || 'chave_padrao_desenvolvimento';
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:senha@localhost:5432/pdv',
+    connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
 // ==========================================
 // ☁️ INICIALIZAÇÃO DO BANCO
 // ==========================================
-const initDB = async () => { 
+const initDB = async () => {
     try {
         await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario VARCHAR(255) UNIQUE, senha VARCHAR(255), cargo VARCHAR(50))`);
         await pool.query(`CREATE TABLE IF NOT EXISTS produtos (id SERIAL PRIMARY KEY, codigo VARCHAR(255) UNIQUE, nome VARCHAR(255), precoCusto DECIMAL(10,2), precoVenda DECIMAL(10,2), precoPromocao DECIMAL(10,2), emPromocao INTEGER DEFAULT 0, estoque INTEGER, vendidos INTEGER DEFAULT 0)`);
         await pool.query(`CREATE TABLE IF NOT EXISTS vendas (id SERIAL PRIMARY KEY, total DECIMAL(10,2), lucro DECIMAL(10,2), data TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
-        
+
         await pool.query(`CREATE TABLE IF NOT EXISTS itens_venda (
             id SERIAL PRIMARY KEY,
             venda_id INTEGER,
@@ -208,7 +208,7 @@ app.post('/api/vendas', verificarToken, permitirCargos(['gerente', 'vendedor']),
     const { total, lucro, itens } = req.body;
     try {
         const vendaPrincipal = await pool.query(
-            "INSERT INTO vendas (total, lucro) VALUES ($1, $2) RETURNING id", 
+            "INSERT INTO vendas (total, lucro) VALUES ($1, $2) RETURNING id",
             [total, lucro]
         );
         const vendaId = vendaPrincipal.rows[0].id;
@@ -217,10 +217,10 @@ app.post('/api/vendas', verificarToken, permitirCargos(['gerente', 'vendedor']),
             await pool.query(
                 `INSERT INTO itens_venda (venda_id, produto_codigo, nome_produto, preco_custo, preco_venda_real, quantidade) 
                  VALUES ($1, $2, $3, $4, $5, $6)`,
-                [vendaId, item.codigo, item.nome, (item.precoUnitario - (item.lucroTotal/item.qtd)), item.precoUnitario, item.qtd]
+                [vendaId, item.codigo, item.nome, (item.precoUnitario - (item.lucroTotal / item.qtd)), item.precoUnitario, item.qtd]
             );
             await pool.query(
-                "UPDATE produtos SET estoque = estoque - $1, vendidos = COALESCE(vendidos, 0) + $1 WHERE codigo = $2", 
+                "UPDATE produtos SET estoque = estoque - $1, vendidos = COALESCE(vendidos, 0) + $1 WHERE codigo = $2",
                 [item.qtd, item.codigo]
             );
         }
@@ -260,7 +260,7 @@ app.get('/api/relatorios', verificarToken, permitirCargos(['gerente']), async (r
             "SELECT nome, vendidos FROM produtos WHERE vendidos > 0 ORDER BY vendidos DESC LIMIT 10"
         );
 
-        res.json({ totais, topProdutos: topProd.rows }); 
+        res.json({ totais, topProdutos: topProd.rows });
     } catch (err) { res.status(500).json({ erro: "Erro nos relatórios" }); }
 });
 
@@ -275,10 +275,10 @@ app.get('/api/exportar-vendas', async (req, res) => {
         `);
 
         const cabecalho = "SKU;PRODUTO;CUSTO_UN;VENDA_UN;QTD;SUBTOTAL;DATA_HORA\n";
-        const linhas = result.rows.map(v => 
+        const linhas = result.rows.map(v =>
             `${v.produto_codigo};${v.nome_produto.toUpperCase()};${v.preco_custo};${v.preco_venda_real};${v.quantidade};${v.subtotal};${v.momento}`
         ).join('\n');
-        
+
         res.header('Content-Type', 'text/csv; charset=utf-8');
         res.attachment('relatorio_detalhado_vendas.csv');
         return res.send('\ufeff' + cabecalho + linhas);
